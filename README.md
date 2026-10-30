@@ -1,21 +1,23 @@
 # TideLine
 
-An offline Android tide widget with a white tide curve, a central mean-sea-level time axis, grey high/low level marks and the current predicted height. Tap the widget for details and settings.
+An offline Android tide widget with a white tide curve, a central mean-sea-level time axis, grey high/low level marks and a timestamped predicted height. Tap the widget for details and settings. Thin grey high/low guides span the graph with gaps around the value labels.
 
-- Three-hour default forecast, with 2/3/4/6/12/24-hour options for each widget.
-- Whole-hour clock labels and 20-minute ticks in the three-hour view. Smaller minute labels appear where they fit.
+- Four-hour default forecast, with 2/3/4/6/12/24-hour options for each widget.
+- Whole-hour labels above/below the axis, with 20-minute ticks in the four-hour view. The inset bottom-left timestamp and height identify the last update. Hours shorten to `19` on small widgets; wider widgets use `19:00` with a smaller grey minute suffix.
 - Fixed coordinates or approximate current location. Optional background following keeps selected widgets near you without opening the app.
 - Clear coastal-distance and missing-data messages instead of an invented forecast.
-- Dark, transparent and light palettes, custom colours, adjustable label/tick size and independent horizontal/vertical padding. Vertical padding defaults to zero.
+- Dark, transparent and light palettes, custom colours, adjustable label/tick size and independent horizontal/vertical padding. Vertical padding and rounded corners default to zero.
 - All 17 EOT20 constituents, calculated locally. No Internet permission, accounts, advertising or analytics.
 
 TideLine is an approximation for casual interest. It excludes weather-driven water-level changes and should not be used for navigation, safety decisions or critical activities. Heights are centimetres relative to the model’s mean sea level, rather than chart-datum depths. Coverage is limited by the global model and mapped coastline; some small harbours/fjords are unsupported, and EOT20 has no Caspian coefficients.
 
 ## Use
 
-Install an APK you build, open TideLine, choose a fixed location or allow approximate location, then use **Add widget to home screen** or the launcher's widget picker. Each widget retains its own location, duration and appearance. Existing saved durations are preserved when the default changes.
+Install an APK you build and open TideLine. **Set location** near the top jumps to explicit **Current location** / **Specific location** choices. A specific location accepts latitude, longitude and an optional name. Then use **Add widget to home screen** or the launcher's widget picker. Each widget retains its own location, duration and appearance. Existing widget durations are preserved; the old new-widget template is migrated to four hours, and adding from an existing widget starts the new one at four hours.
 
-The widget normally refreshes approximately every 15 minutes. Android can delay updates during sleep or battery saving, so its timeline uses absolute device clock times. The curve covers the configured duration from its last calculation; “Now” is the predicted value at that calculation time. It is not a live clock. Refreshing in the app calculates immediately.
+A brief accuracy note near the top reports the native engine's validated coastal cohort: median RMS error 5.3% of tidal range (6.5 cm), with larger local errors possible.
+
+The widget normally refreshes approximately every 15 minutes. Android can delay updates during sleep or battery saving, so its timeline uses absolute device clock times. The curve covers the configured duration from its last calculation; the inset bottom-left time and height identify that calculation. Larger dots mark the starts of the curve and time axis. It is not a live clock. Refreshing in the app calculates immediately.
 
 Background following is **off by default**. Enabling it shows an in-app disclosure before permission setup. On Android 10+ it requires background location access; Android 11+ grants this through app settings. Only approximate location is requested. Updates use occasional system network/passive fixes, with no continuous GPS service. Android may deliver them only a few times an hour or delay them further. Only the latest fix is saved locally, with its age shown in the app. Fixed locations and foreground-only updates work without background permission.
 

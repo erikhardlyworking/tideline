@@ -118,9 +118,16 @@ class MainActivity : Activity() {
         } else scroll.fitsSystemWindows = true
         root.addView(text(getString(R.string.app_name), 34f, ink, true))
         root.addView(text(getString(R.string.tagline), 15f, muted))
+        root.addView(text(getString(R.string.accuracy_note), 13f, muted).apply { id = R.id.accuracy_note })
+        lateinit var locationPanel: LinearLayout
+        root.addView(button(getString(R.string.set_location)) {
+            scroll.smoothScrollTo(0, (locationPanel.top - dp(8)).coerceAtLeast(0))
+        }.apply { id = R.id.location_shortcut })
         val ids = WidgetUpdates.ids(this)
-        if (ids.size > 1 || (ids.isNotEmpty() && widgetId == 0)) {
-            val choices = intArrayOf(0, *ids)
+        if (ids.isNotEmpty()) {
+            // Keep a newly allocated/configuring widget selected even before
+            // the launcher reports it in the provider's active widget list.
+            val choices = (listOf(0) + ids.toList() + widgetId).distinct().toIntArray()
             val spinner = Spinner(this)
             spinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, choices.map { if (it == 0) getString(R.string.new_widget) else getString(R.string.widget_number, it) })
             spinner.setSelection(choices.indexOf(widgetId).coerceAtLeast(0))
@@ -152,18 +159,27 @@ class MainActivity : Activity() {
         detail.addView(text(getString(R.string.datum_note), 12f, muted))
 
         val location = card(getString(R.string.location))
-        val follow = Switch(this).apply { text = getString(R.string.use_current_location); isChecked = settings.followCurrent; minHeight = dp(48) }
-        location.addView(follow)
+        locationPanel = location
+        val modes = RadioGroup(this)
+        val follow = RadioButton(this).apply { id = R.id.location_mode_current; text = getString(R.string.use_current_location); minHeight = dp(48) }
+        val specific = RadioButton(this).apply { id = R.id.location_mode_fixed; text = getString(R.string.specific_location); minHeight = dp(48) }
+        modes.addView(follow); modes.addView(specific)
+        modes.check(if (settings.followCurrent) follow.id else specific.id)
+        location.addView(modes)
         locationStatus = text("", 12f, muted); location.addView(locationStatus)
         val fixed = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; visibility = if (settings.followCurrent) View.GONE else View.VISIBLE }
         fun coordinate(hintText: String, value: Double) = EditText(this).apply {
             hint = hintText; inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL or InputType.TYPE_NUMBER_FLAG_SIGNED; setSingleLine(true)
             if (value.isFinite()) setText(String.format(java.util.Locale.ROOT, "%.6f", value))
         }
-        val latitude = coordinate(getString(R.string.latitude), settings.latitude)
-        val longitude = coordinate(getString(R.string.longitude), settings.longitude)
-        row(fixed, latitude, longitude)
-        val name = EditText(this).apply { hint = getString(R.string.place_name); setText(settings.place); setSingleLine(true); inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS }
+        fixed.addView(text(getString(R.string.fixed_location_help), 12f, muted))
+        val latitude = coordinate(getString(R.string.latitude), settings.latitude).apply { id = R.id.fixed_latitude }
+        val longitude = coordinate(getString(R.string.longitude), settings.longitude).apply { id = R.id.fixed_longitude }
+        fun field(label: Int, input: View) = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL; addView(text(getString(label), 12f, muted)); addView(input)
+        }
+        row(fixed, field(R.string.latitude, latitude), field(R.string.longitude, longitude))
+        val name = EditText(this).apply { id = R.id.fixed_location_name; hint = getString(R.string.place_name); setText(settings.place); setSingleLine(true); inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS }
         fixed.addView(name)
         fixed.addView(button(getString(R.string.save_location)) {
             val lat = latitude.text.toString().trim().replace(',', '.').toDoubleOrNull()
@@ -174,7 +190,7 @@ class MainActivity : Activity() {
                 settings.latitude = lat; settings.longitude = lon; settings.place = name.text.toString().trim(); settings.locationAt = 0; settings.accuracy = 0f
                 save(); recalculate()
             }
-        })
+        }.apply { id = R.id.save_fixed_location })
         location.addView(fixed)
         val locateButton = button(getString(R.string.use_my_location)) { if (follow.isChecked) requestLocation() else follow.isChecked = true }
         location.addView(locateButton)
@@ -194,7 +210,8 @@ class MainActivity : Activity() {
                     }.show()
             }
         }
-        follow.setOnCheckedChangeListener { _, checked ->
+        modes.setOnCheckedChangeListener { _, selected ->
+            val checked = selected == follow.id
             settings.followCurrent = checked; fixed.visibility = if (checked) View.GONE else View.VISIBLE
             background.visibility = if (checked) View.VISIBLE else View.GONE
             if (checked) { settings.latitude = Double.NaN; settings.longitude = Double.NaN; settings.place = ""; settings.locationAt = 0 }
@@ -384,8 +401,9 @@ class MainActivity : Activity() {
     private fun pinWidget() {
         val manager = AppWidgetManager.getInstance(this)
         if (!manager.isRequestPinAppWidgetSupported) { Toast.makeText(this, R.string.pin_not_supported, Toast.LENGTH_LONG).show(); return }
-        store.put(0, settings)
-        val callback = PendingIntent.getBroadcast(this, 70, Intent(this, PinReceiver::class.java).putExtra("settings", settings.toJson()), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE)
+        val draft = settings.copy(hours = if (widgetId == 0) settings.hours else 4)
+        store.put(0, draft)
+        val callback = PendingIntent.getBroadcast(this, 70, Intent(this, PinReceiver::class.java).putExtra("settings", draft.toJson()), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE)
         manager.requestPinAppWidget(ComponentName(this, TideWidgetProvider::class.java), null, callback)
     }
 }

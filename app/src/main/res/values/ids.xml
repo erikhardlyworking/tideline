@@ -1,0 +1,10 @@
+<resources>
+    <item name="accuracy_note" type="id" />
+    <item name="location_shortcut" type="id" />
+    <item name="location_mode_current" type="id" />
+    <item name="location_mode_fixed" type="id" />
+    <item name="fixed_latitude" type="id" />
+    <item name="fixed_longitude" type="id" />
+    <item name="fixed_location_name" type="id" />
+    <item name="save_fixed_location" type="id" />
+</resources>

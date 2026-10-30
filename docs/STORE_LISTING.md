@@ -12,7 +12,7 @@ The widget shows a tide curve around a central mean-sea-level line, the next 24-
 
 Choose a fixed coastal location or approximate current location. Optional background following accesses approximate location while the app is closed to keep your widget near you as you move. It is off by default and requires your permission. Only the latest fix stays on your device; TideLine does not upload location or keep a travel history.
 
-Choose a 2, 3, 4, 6, 12 or 24-hour view. The default three-hour display uses whole-hour labels and 20-minute ticks. Adjust colours, transparency, label size, line thickness and padding. Each widget has its own settings.
+Choose a 2, 3, 4, 6, 12 or 24-hour view. The default four-hour display shows a timestamped height, whole-hour labels above/below the axis and 20-minute ticks, with thin high/low guides. A short accuracy note appears near the top of the app. Adjust colours, transparency, label size, line thickness and padding. Each widget has its own settings.
 
 Widget refreshes are approximately every 15 minutes and may be delayed by Android. Location following also updates occasionally. The display uses absolute local clock times rather than acting as a live clock.
 
