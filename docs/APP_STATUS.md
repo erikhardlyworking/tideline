@@ -4,6 +4,8 @@ Implemented 30 October 2026 from the widget description and Rainline's visual re
 
 ## Behaviour
 
+Version 0.2.2 adds **View on GitHub** to the privacy policy and data/software notice dialogs, retaining the bundled documents for offline reading. The targets are the repository's `main/PRIVACY.md` and `main/docs/DATA_NOTICES.txt`. README/Play notes include the same URLs. The repository stays private during testing, so anonymous access is intentionally pending its later visibility change.
+
 Version 0.2.1 uses a four-hour default for new widgets, including a one-time migration of the old new-widget template. Existing widget durations remain unchanged. Adding from an existing widget does not copy its old two-hour duration into the new widget. The selectable durations are 2/3/4/6/12/24 hours.
 
 The widget has a central mean-sea-level axis with whole-hour labels above/below it. Captions shorten to `19` on small widgets; wider widgets can use `19:00` with a smaller grey `:00`. Short tick marks remain at 20-minute intervals in the 2–4 hour views. There are no intermediate minute captions. Labels are fitted around other annotations and the actual curve. Near-start hour captions remain whenever they fit; the other row and shorter hour text are tried before omitting a caption.
@@ -29,6 +31,8 @@ The astronomical calculation uses exact carrier frequencies at each UTC instant,
 The coastline is Natural Earth ocean/Caspian geometry, clipped into geographic tiles with original double-precision vertices. The selector uses complex bilinear interpolation where marine support is available, otherwise a bounded nearest reachable wet cell. The weighted experiment did not demonstrate a general accuracy gain, so IDW was not adopted as a universal fallback. Actual selected sea coordinates, snapping distance and model distance are retained. Missing data is shown as unavailable. The Caspian remains unsupported because EOT20 has no coefficients there.
 
 ## Verification actually performed
+
+Version 0.2.2: APK, native-test APK and unsigned release bundle build successfully; lint has zero errors. The installed-phone checks, including all 50 render audits, passed after waking the dozing device. Both URL paths were verified against `origin/main` through authenticated Git access. Anonymous requests returned 404 as expected for the intentionally private testing repository; public-access verification is deferred until its visibility changes.
 
 - Version 0.2.1: debug APK, native-test APK and unsigned release AAB build successfully; eight JVM tests pass and lint reports zero errors. Installed on the Samsung SM_S938B/API 37. Fifty actual-data renders across sizes, label scales and refresh minutes passed pairwise text-bound checks and guide/value intersection checks. Native checks also verified the four-hour new-template migration without changing an existing two-hour widget, persistence of a later deliberate default choice, specific-location saving, the accuracy note, single-line buttons, detail launch and widget taps. Screenshots and `results/device_tests_v0.2.1.log` describe this build. A selector fix keeps a newly allocated/configuring widget selected even before it appears in the provider's active ID list. Background permission approval and actual movement/reboot/Doze journeys remain manual checks.
 - Five deterministic calculation/data JVM tests passed, including genuine pyTMD fixtures, an analytic solar constituent, numerical extrema, date bounds, real lossless-decoding fixtures, corruption/truncation, phase wrapping and the longitude seam.

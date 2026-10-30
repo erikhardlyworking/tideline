@@ -1,6 +1,6 @@
 # Google Play preparation
 
-Prepared 30 October 2026 for TideLine 0.2.1 (`app.tideline`, version code 5). This prepares source, a policy, listing text and build outputs; it does not submit the app to Google Play or assert store approval.
+Prepared 30 October 2026 for TideLine 0.2.2 (`app.tideline`, version code 6). This prepares source, a policy, listing text and build outputs; it does not submit the app to Google Play or assert store approval.
 
 ## Bundle and signing
 
@@ -14,7 +14,12 @@ The output is `app/build/outputs/bundle/release/app-release.aab`. Without an exp
 
 ## Privacy and Data safety
 
-The canonical policy is `PRIVACY.md`, bundled in the app and rendered by `tools/render_privacy.py` into `docs/site/`. It names TideLine and its developer, explains foreground/background location, local retention/deletion, permissions and contact. A public policy URL still needs to be deployed and verified. Enable GitHub Pages with the GitHub Actions source, then run the manual Pages workflow. Intended URL: https://erikhardlyworking.github.io/tideline/privacy.html . If this repository remains private, verify that its Pages plan/configuration permits a publicly accessible policy, or host the generated HTML elsewhere.
+The canonical policy is `PRIVACY.md`, bundled in the app and rendered by `tools/render_privacy.py` into `docs/site/`. Both in-app document dialogs offer a **View on GitHub** button:
+
+- Privacy policy: https://github.com/erikhardlyworking/tideline/blob/main/PRIVACY.md
+- Data and software notices: https://github.com/erikhardlyworking/tideline/blob/main/docs/DATA_NOTICES.txt
+
+The repository is intentionally private during testing. Before submitting to Play, make the policy publicly accessible and verify its URL while signed out. After making the repository public, its policy URL above can be used as the repository-hosted link. A standalone HTML policy is also prepared in `docs/site/`; the manual Pages workflow can publish it after Pages is configured. Intended HTML URL: https://erikhardlyworking.github.io/tideline/privacy.html .
 
 For the current code, no user data is transmitted off-device by the app: there is no Internet permission, analytics, ad SDK, account or developer backend. Approximate location is accessed and the latest fix is saved locally; a fixed coordinate may be entered manually. The system location provider has its own device/OS settings. Describe this consistently in the policy and permission declarations. Data safety's collection questions distinguish off-device transmission from local processing; review the final binary and all dependencies before submitting the answers. No account-deletion endpoint is needed because TideLine has no accounts. Clearing app storage or uninstalling deletes local data.
 
