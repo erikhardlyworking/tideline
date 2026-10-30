@@ -1,6 +1,6 @@
 # Google Play preparation
 
-Prepared 30 October 2026 for TideLine 0.2.2 (`app.tideline`, version code 6). This prepares source, a policy, listing text and build outputs; it does not submit the app to Google Play or assert store approval.
+Prepared 30 October 2026 for TideLine 0.2.3 (`app.tideline`, version code 7). This prepares source, a policy, listing text and build outputs; it does not submit the app to Google Play or assert store approval.
 
 ## Bundle and signing
 

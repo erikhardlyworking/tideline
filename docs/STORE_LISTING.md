@@ -23,3 +23,5 @@ Tides are approximate astronomical predictions. Weather effects such as wind and
 Data: EOT20 by Hart-Davis and colleagues, CC BY 4.0, with lossless coastal conversion. Shoreline: Natural Earth, public domain. Astronomical reference: pyTMD, MIT.
 
 Privacy policy: deploy and verify the public policy URL before submitting; see PLAY_STORE.md.
+
+More apps by this developer: https://play.google.com/store/apps/dev?id=6256987868491351341

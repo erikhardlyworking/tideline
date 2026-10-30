@@ -57,6 +57,8 @@ The calculation engine was checked against pyTMD at 179,360 instants, with maxim
 
 Both the [privacy policy](https://github.com/erikhardlyworking/tideline/blob/main/PRIVACY.md) and [data/software notices](https://github.com/erikhardlyworking/tideline/blob/main/docs/DATA_NOTICES.txt) are available offline in the app, with a **View on GitHub** button in each document dialog. The repository is intentionally private during testing; these web links become publicly readable when its visibility changes. `docs/site/privacy.html` is generated from the same policy using `python3 tools/render_privacy.py`. A standalone HTML page is optional: after enabling GitHub Pages with GitHub Actions, run the manual **Publish privacy page** workflow. Its intended URL is `https://erikhardlyworking.github.io/tideline/privacy.html`. For Play Console, use a policy URL that has been verified readable without signing in; a private repository link will not be sufficient.
 
+[More apps by this developer on Google Play](https://play.google.com/store/apps/dev?id=6256987868491351341).
+
 For bugs or privacy inquiries, use the repository's Issues page. Avoid posting private location details in public issues.
 
 Original application code: Apache-2.0. EOT20 data: CC BY 4.0. Natural Earth shoreline: public domain. Astronomical reference calculations: pyTMD, MIT. Full notices are retained separately.

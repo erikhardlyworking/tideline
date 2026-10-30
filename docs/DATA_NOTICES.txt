@@ -1,6 +1,6 @@
 TideLine — offline astronomical tide
 
-Original TideLine code: Apache License 2.0. The minimalist line chart and colour/opacity controls are inspired by the user's Rainline widget. Rainline's MET integration and rain-specific rendering are not used.
+Original TideLine code: Apache License 2.0.
 
 EOT20 ocean tide model
 Hart-Davis, M., Piccioni, G., Dettmering, D., Schwatke, C., Passaro, M. and Seitz, F. (2021).

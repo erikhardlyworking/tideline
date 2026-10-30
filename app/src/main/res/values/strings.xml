@@ -68,7 +68,9 @@
     <string name="refresh_explanation">The widget refreshes approximately every 15 minutes; Android may delay it longer, especially during sleep or battery saving. It is not a live clock. The bottom-left time and height are from the last update. The main time line labels whole hours; short ticks mark 20 minutes in the 2–4 hour views. Background following is optional and also updates occasionally. Open the app or tap Refresh for an immediate calculation.</string>
     <string name="privacy_policy">Privacy policy</string>
     <string name="view_on_github">View on GitHub</string>
-    <string name="no_browser">No web browser is available. You can still read this document in the app.</string>
+    <string name="no_browser">No app is available to open this link.</string>
+    <string name="other_apps">More apps on Google Play</string>
+    <string name="other_apps_url" translatable="false">https://play.google.com/store/apps/dev?id=6256987868491351341</string>
     <string name="privacy_policy_url" translatable="false">https://github.com/erikhardlyworking/tideline/blob/main/PRIVACY.md</string>
     <string name="notices_url" translatable="false">https://github.com/erikhardlyworking/tideline/blob/main/docs/DATA_NOTICES.txt</string>
     <string name="astronomical_note">Approximate astronomical tide. Weather effects excluded.</string>

@@ -277,21 +277,22 @@ class MainActivity : Activity() {
         val about = card(getString(R.string.about_data))
         about.addView(text(getString(R.string.about_body), 13f, muted))
         about.addView(text(getString(R.string.attribution), 12f, muted))
+        about.addView(button(getString(R.string.other_apps)) { openWebLink(R.string.other_apps_url) })
         about.addView(button(getString(R.string.privacy_policy)) {
             val policy = assets.open("PRIVACY.md").bufferedReader().use { it.readText() }
             AlertDialog.Builder(this).setTitle(R.string.privacy_policy).setMessage(policy.replace(Regex("(?m)^#{1,6} "), ""))
-                .setNeutralButton(R.string.view_on_github) { _, _ -> openRepositoryDocument(R.string.privacy_policy_url) }
+                .setNeutralButton(R.string.view_on_github) { _, _ -> openWebLink(R.string.privacy_policy_url) }
                 .setPositiveButton(android.R.string.ok, null).show()
         })
         about.addView(button(getString(R.string.licences)) {
             val notices = try { assets.open("DATA_NOTICES.txt").bufferedReader().use { it.readText() } } catch (_: Exception) { getString(R.string.attribution) }
             AlertDialog.Builder(this).setTitle(R.string.licences).setMessage(notices)
-                .setNeutralButton(R.string.view_on_github) { _, _ -> openRepositoryDocument(R.string.notices_url) }
+                .setNeutralButton(R.string.view_on_github) { _, _ -> openWebLink(R.string.notices_url) }
                 .setPositiveButton(android.R.string.ok, null).show()
         })
         drawCharts()
     }
-    private fun openRepositoryDocument(url: Int) {
+    private fun openWebLink(url: Int) {
         try { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(getString(url)))) }
         catch (_: ActivityNotFoundException) { Toast.makeText(this, R.string.no_browser, Toast.LENGTH_SHORT).show() }
     }

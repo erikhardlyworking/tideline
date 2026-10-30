@@ -1,8 +1,10 @@
 # TideLine implementation and test handover
 
-Implemented 30 October 2026 from the widget description and Rainline's visual reference. The current app keeps configuration to location, forecast duration and appearance. It does not include Rainline's MET client or rain-intensity highlighting.
+Implemented 30 October 2026 from the widget description and visual preferences. The main configuration covers location, forecast duration and appearance.
 
 ## Behaviour
+
+Version 0.2.3 adds a general **More apps on Google Play** button in About, linking to the developer page, and removes the specific reference to another widget from these notes and the bundled notices. Data/software licence attribution remains intact.
 
 Version 0.2.2 adds **View on GitHub** to the privacy policy and data/software notice dialogs, retaining the bundled documents for offline reading. The targets are the repository's `main/PRIVACY.md` and `main/docs/DATA_NOTICES.txt`. README/Play notes include the same URLs. The repository stays private during testing, so anonymous access is intentionally pending its later visibility change.
 
@@ -31,6 +33,8 @@ The astronomical calculation uses exact carrier frequencies at each UTC instant,
 The coastline is Natural Earth ocean/Caspian geometry, clipped into geographic tiles with original double-precision vertices. The selector uses complex bilinear interpolation where marine support is available, otherwise a bounded nearest reachable wet cell. The weighted experiment did not demonstrate a general accuracy gain, so IDW was not adopted as a universal fallback. Actual selected sea coordinates, snapping distance and model distance are retained. Missing data is shown as unavailable. The Caspian remains unsupported because EOT20 has no coefficients there.
 
 ## Verification actually performed
+
+Version 0.2.3: APK/test APK/unsigned AAB builds and lint passed. The phone checks passed, including all 50 audited renders and single-line controls. The developer-profile URL in resources matches the supplied Google Play address. Current source and bundled notices contain no reference to the earlier widget; all data/software licence notices remain.
 
 Version 0.2.2: APK, native-test APK and unsigned release bundle build successfully; lint has zero errors. The installed-phone checks, including all 50 render audits, passed after waking the dozing device. Both URL paths were verified against `origin/main` through authenticated Git access. Anonymous requests returned 404 as expected for the intentionally private testing repository; public-access verification is deferred until its visibility changes.
 

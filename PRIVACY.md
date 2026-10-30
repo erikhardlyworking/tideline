@@ -20,7 +20,7 @@ TideLine requests occasional network/passive system locations, not continuous GP
 
 Settings and the latest fix are kept in Android's app-private storage. App backup is disabled. Data remains until replaced, its widget is removed, or you clear app storage or uninstall TideLine. Removing a widget deletes that widget's settings; app-wide new-widget defaults may retain the latest selected location. Clear app storage or uninstall to remove all TideLine settings and saved locations. You can revoke location permissions through Android settings at any time. A revoked permission prevents future access; it does not automatically erase an already saved fix.
 
-There are no TideLine accounts or remote records to delete. If you contact the developer through GitHub, GitHub processes that communication under its own privacy policy. Opening an external website uses your browser, separately from TideLine's offline calculations.
+There are no TideLine accounts or remote records to delete. If you contact the developer through GitHub, GitHub processes that communication under its own privacy policy. Opening external links uses your browser or another app, separately from TideLine's offline calculations.
 
 ## Changes
 

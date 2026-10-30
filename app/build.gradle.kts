@@ -6,8 +6,8 @@ android {
         applicationId = "app.tideline"
         minSdk = 26
         targetSdk = 36
-        versionCode = 6
-        versionName = "0.2.2"
+        versionCode = 7
+        versionName = "0.2.3"
         testInstrumentationRunner = "app.tideline.WidgetInstrumentation"
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
