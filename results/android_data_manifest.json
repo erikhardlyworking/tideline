@@ -1,0 +1,16 @@
+{
+  "path": "data/packs/tideline-global.tpk",
+  "bytes": 30945129,
+  "sha256": "6e07ba773ae1b679a9b4fe7f4b7016f0dfa6708516e3541a8ed08b69660c06e8",
+  "entries": 3119,
+  "header_bytes": 517585,
+  "astronomy_nodes": 7672,
+  "astronomy_basis_terms": 34,
+  "date_range": [
+    "2020-01-01",
+    "2041-01-01"
+  ],
+  "build_seconds": 55.66872973699901,
+  "lossless_tide_coefficients": true,
+  "compression": "zlib for native JVM/Android decoding without native third-party libraries"
+}

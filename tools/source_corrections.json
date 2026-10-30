@@ -1,0 +1,14 @@
+{
+  "NOAA:6835001": {
+    "name": "Djakarta (Tandjungpriok), Java",
+    "latitude": -6.1,
+    "longitude": 106.88333333333334,
+    "published_coordinates": "6 degrees 06 minutes South, 106 degrees 53 minutes East",
+    "coordinate_precision_degrees": 0.016666666666666666,
+    "source_url": "https://tidesandcurrents.noaa.gov/tidetables/2016/pttt2016book.pdf",
+    "printed_page": 403,
+    "pdf_page_index": 412,
+    "table_station_number": 1867,
+    "reason": "The current NOAA catalog and individual station API place the named Java port at 2.2016667 South, about 433 km north of the location printed in NOAA's own tide tables. Use the published port coordinate rather than silently score a different sea location. Original API-coordinate result is retained separately."
+  }
+}
