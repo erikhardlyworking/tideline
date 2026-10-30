@@ -10,7 +10,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("task", choices=["build", "test", "device-apk", "data", "validate"])
+    tasks = ["build", "test", "device-apk", "data"]
+    # The development workspace can also contain the separate research campaign.
+    if all((ROOT / "tools" / name).is_file() for name in ("validate_kotlin.py", "validate_locations.py")):
+        tasks.append("validate")
+    parser.add_argument("task", choices=tasks)
     task = parser.parse_args().task
     environment = os.environ.copy()
     if not environment.get("JAVA_HOME") and (ROOT / ".build-tools/jdk/bin/java").exists():

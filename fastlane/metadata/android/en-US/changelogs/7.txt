@@ -1,4 +1,0 @@
-Offline tide forecasts for your home screen.
-Four-hour default, with adjustable forecast duration and appearance.
-Fixed locations or approximate current location, with optional background following.
-Tap for a 24-hour graph, next high and low tides, accuracy information and settings.

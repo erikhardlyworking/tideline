@@ -14,7 +14,7 @@ val uploadValues: Map<String, String?> = uploadFields.associateWith { field ->
 val uploadSigningConfigured = uploadValues.values.any { it != null }
 if (uploadSigningConfigured) {
     check(uploadValues.values.all { !it.isNullOrBlank() }) {
-        "Upload signing is incomplete. Supply all four fields in key.properties or TIDELINE_* variables; see docs/PLAY_STORE.md."
+        "Upload signing is incomplete. Supply all four fields in key.properties or TIDELINE_* variables; see README.md."
     }
     check(rootProject.file(uploadValues.getValue("storeFile")!!).isFile) { "Upload keystore file does not exist." }
 }

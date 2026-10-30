@@ -16,8 +16,6 @@ jobs:
           java-version: '17'
       - name: Check bundled model identity
         run: python3 tools/verify_model_pack.py
-      - name: Validate Play metadata and graphics
-        run: python3 tools/prepare_play_release.py --check-only
       - name: Install Android SDK components
         run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0'
       - name: Test and build

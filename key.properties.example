@@ -1,4 +1,4 @@
-# Copy to ../key.properties (ignored), or use the corresponding environment variables.
+# Copy to key.properties in the project root (ignored), or use the environment variables.
 # Paths resolve from the project root. Keep the real keystore outside the repository.
 # Do not reuse Android's debug key. Use your protected Google Play upload key.
 storeFile=/absolute/path/to/tideline-upload.jks

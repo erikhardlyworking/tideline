@@ -28,3 +28,12 @@ key.properties
 play-service-account.json
 publishing/local/
 dist/
+
+# Local store publication material and research outputs.
+/fastlane/
+/publishing/
+/results/
+/docs/APP_STATUS.md
+/docs/PLAY_STORE.md
+/docs/STORE_LISTING.md
+/docs/RESEARCH.md

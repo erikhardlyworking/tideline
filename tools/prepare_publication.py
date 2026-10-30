@@ -1,12 +1,18 @@
-"""Export reviewed source/data/docs only, excluding the private research workspace and keys."""
+"""Export buildable widget source and policies, preserving local Play/research materials."""
 from pathlib import Path
 import argparse
 import shutil
 
 ROOT = Path(__file__).resolve().parents[1]
-ROOT_FILES = ['README.md','PRIVACY.md','LICENSE','.gitignore','settings.gradle.kts','build.gradle.kts','gradle.properties','gradlew','gradlew.bat','requirements.lock.txt']
-DIRECTORIES = ['app','tide-core','tide-cli','gradle','tools','docs','.github','fastlane','publishing']
-REPORTS = ['REPORT.md','REPORT.html','INTERPOLATION.md','android_data_manifest.json','kotlin_validation.json','kotlin_location_validation.json','play_preparation.json']
+ROOT_FILES = ['README.md','PRIVACY.md','LICENSE','.gitignore','settings.gradle.kts','build.gradle.kts','gradle.properties','gradlew','gradlew.bat','requirements.lock.txt','key.properties.example']
+DIRECTORIES = ['app','tide-core','tide-cli','gradle','.github']
+SOURCE_FILES = [
+    'docs/DATA_NOTICES.txt', 'docs/PYTMD_LICENSE.txt',
+    'docs/site/index.html', 'docs/site/privacy.html',
+    'tools/build_android_data.py', 'tools/coastal.py', 'tools/common.py',
+    'tools/download_inputs.py', 'tools/prepare_publication.py',
+    'tools/render_privacy.py', 'tools/task.py', 'tools/verify_model_pack.py',
+]
 EXCLUDE = {'build','.gradle','__pycache__','.idea','.git','local'}
 
 def private_file(path):
@@ -30,7 +36,7 @@ def main():
         for path in (ROOT/directory).rglob('*'):
             if path.is_file() and not private_file(path) and not any(part in EXCLUDE for part in path.relative_to(ROOT/directory).parts):
                 copy(path.relative_to(ROOT))
-    for report in REPORTS: copy(Path('results')/report)
+    for name in SOURCE_FILES: copy(Path(name))
     copy(Path('data/packs/tideline-global.tpk'))
     files=[p for p in dest.rglob('*') if p.is_file()]
     print(f'Exported {len(files)} files, {sum(p.stat().st_size for p in files):,} bytes to {dest}')

@@ -21,7 +21,7 @@ https://github.com/pyTMD/pyTMD/tree/2.2.9
 Android runtime dependencies
 AndroidX WorkManager: Apache License 2.0.
 Kotlin standard library and kotlinx.serialization: Apache License 2.0.
-No forecast API, account, advertising, analytics or tracking SDK is used. The application does not request Internet permission. Android location requests use platform APIs in the foreground, and only the latest configured fix is retained.
+No forecast API, account, advertising, analytics or tracking SDK is used. The application does not request Internet permission. Android location requests use platform APIs for foreground updates and explicitly enabled background following; only the latest configured fix is retained.
 
 The high/low labels are model predictions in centimetres relative to model mean sea level. They are not chart-datum depths or observed sea levels. Wind and weather effects are excluded. A missing prediction is displayed as unavailable.
 
