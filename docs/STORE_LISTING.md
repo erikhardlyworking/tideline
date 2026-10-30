@@ -1,27 +1,11 @@
-# TideLine store listing draft
+# TideLine store listing
 
-App name: TideLine
+The upload-ready English listing is maintained in `fastlane/metadata/android/en-US/`:
 
-Short description: Offline tide curves for your coast, right on your home screen.
+- [App name](../fastlane/metadata/android/en-US/title.txt)
+- [Short description](../fastlane/metadata/android/en-US/short_description.txt)
+- [Full description](../fastlane/metadata/android/en-US/full_description.txt)
+- [Release notes for version code 7](../fastlane/metadata/android/en-US/changelogs/7.txt)
+- [Icon, feature graphic and real phone screenshots](../fastlane/metadata/android/en-US/images/)
 
-Full description:
-
-See the tide ahead with a simple, adjustable home-screen widget. TideLine calculates astronomical tides offline using bundled EOT20 ocean data.
-
-The widget shows a tide curve around a central mean-sea-level line, the next 24-hour high/low range and the current predicted height in centimetres. Tap for a full-day graph, next high and low times, and settings.
-
-Choose a fixed coastal location or approximate current location. Optional background following accesses approximate location while the app is closed to keep your widget near you as you move. It is off by default and requires your permission. Only the latest fix stays on your device; TideLine does not upload location or keep a travel history.
-
-Choose a 2, 3, 4, 6, 12 or 24-hour view. The default four-hour display shows a timestamped height, whole-hour labels above/below the axis and 20-minute ticks, with thin high/low guides. A short accuracy note appears near the top of the app. Adjust colours, transparency, label size, line thickness and padding. Each widget has its own settings.
-
-Widget refreshes are approximately every 15 minutes and may be delayed by Android. Location following also updates occasionally. The display uses absolute local clock times rather than acting as a live clock.
-
-No accounts, advertising, analytics or live forecast requests. TideLine has no Internet permission.
-
-Tides are approximate astronomical predictions. Weather effects such as wind and storm surge are excluded. Local harbours and narrow fjords can differ substantially; some coastal locations are unsupported, and no Caspian tide data is included. Heights are relative to model mean sea level, not chart-datum depths. Do not use TideLine for navigation, safety decisions or critical activities.
-
-Data: EOT20 by Hart-Davis and colleagues, CC BY 4.0, with lossless coastal conversion. Shoreline: Natural Earth, public domain. Astronomical reference: pyTMD, MIT.
-
-Privacy policy: deploy and verify the public policy URL before submitting; see PLAY_STORE.md.
-
-More apps by this developer: https://play.google.com/store/apps/dev?id=6256987868491351341
+[Google Play publication instructions](PLAY_STORE.md) map these to Console fields and explain signing and the remaining publisher steps. [Console details](../publishing/console-details.json) leaves unspecified contact/audience/pricing choices empty rather than putting placeholders in public listing text.

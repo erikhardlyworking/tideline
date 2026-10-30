@@ -35,7 +35,7 @@ python3 tools/verify_model_pack.py
 ./gradlew :app:bundleRelease
 ```
 
-Windows can use `gradlew.bat` or `python tools/task.py build`. Debug APK: `app/build/outputs/apk/debug/app-debug.apk`. Release bundle: `app/build/outputs/bundle/release/app-release.aab`. The release bundle is unsigned unless you configure your own upload signing; see [Google Play preparation](docs/PLAY_STORE.md). No signing keys are included.
+Windows can use `gradlew.bat` or `python tools/task.py build`. Debug APK: `app/build/outputs/apk/debug/app-debug.apk`. Release bundle: `app/build/outputs/bundle/release/app-release.aab`. The release bundle is unsigned unless you configure your own upload signing; see [Google Play preparation](docs/PLAY_STORE.md). No signing keys are included. Upload-ready listing text, icon, feature graphic, four real phone screenshots and declaration worksheets are prepared; see [Google Play publication files](docs/PLAY_STORE.md). Validate them with `python3 tools/prepare_play_release.py --check-only`, then package the built bundle with `python3 tools/prepare_play_release.py` (or `--require-signed` for upload).
 
 The repository publication includes the **30,945,129-byte** real `data/packs/tideline-global.tpk`. It is losslessly encoded and licensed separately from the app. The normal build uses that pack and needs no research downloads. It stays uncompressed as an APK asset for direct seeking; its internal tiles are compressed. [Data and software notices](https://github.com/erikhardlyworking/tideline/blob/main/docs/DATA_NOTICES.txt) are bundled in the app. To rebuild the pack from the 2.33 GB official upstream archive, install the pinned Python requirements in a virtual environment and run `python tools/task.py data`; this is an explicit large-data step.
 
@@ -53,12 +53,12 @@ The calculation engine was checked against pyTMD at 179,360 instants, with maxim
 
 ## Privacy, support and publishing
 
-[Privacy policy](https://github.com/erikhardlyworking/tideline/blob/main/PRIVACY.md) · [Google Play preparation](docs/PLAY_STORE.md) · [Store listing draft](docs/STORE_LISTING.md) · [Licence](LICENSE)
+[Privacy policy](https://github.com/erikhardlyworking/tideline/blob/main/PRIVACY.md) · [Google Play preparation](docs/PLAY_STORE.md) · [Store listing and assets](docs/STORE_LISTING.md) · [Licence](LICENSE)
 
 Both the [privacy policy](https://github.com/erikhardlyworking/tideline/blob/main/PRIVACY.md) and [data/software notices](https://github.com/erikhardlyworking/tideline/blob/main/docs/DATA_NOTICES.txt) are available offline in the app, with a **View on GitHub** button in each document dialog. The repository is intentionally private during testing; these web links become publicly readable when its visibility changes. `docs/site/privacy.html` is generated from the same policy using `python3 tools/render_privacy.py`. A standalone HTML page is optional: after enabling GitHub Pages with GitHub Actions, run the manual **Publish privacy page** workflow. Its intended URL is `https://erikhardlyworking.github.io/tideline/privacy.html`. For Play Console, use a policy URL that has been verified readable without signing in; a private repository link will not be sufficient.
 
 [More apps by this developer on Google Play](https://play.google.com/store/apps/dev?id=6256987868491351341).
 
-For bugs or privacy inquiries, use the repository's Issues page. Avoid posting private location details in public issues.
+For support or privacy inquiries, email workinghardlyforyou@gmail.com; bugs can also be reported on the repository's Issues page. Avoid posting private location details in public issues.
 
 Original application code: Apache-2.0. EOT20 data: CC BY 4.0. Natural Earth shoreline: public domain. Astronomical reference calculations: pyTMD, MIT. Full notices are retained separately.

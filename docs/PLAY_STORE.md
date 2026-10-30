@@ -1,42 +1,72 @@
-# Google Play preparation
+# Google Play publication files
 
-Prepared 30 October 2026 for TideLine 0.2.3 (`app.tideline`, version code 7). This prepares source, a policy, listing text and build outputs; it does not submit the app to Google Play or assert store approval.
+Prepared for TideLine 0.2.3 (`app.tideline`, version code 7). This package prepares an English listing, native graphics, real app screenshots, a release bundle and declaration drafts. Nothing has been submitted to Play Console.
 
-## Bundle and signing
+## Files to use
 
-Build with JDK 17 and Android SDK platform 36/build-tools 35.0.0:
+| Play Console field | File |
+| --- | --- |
+| App name | `fastlane/metadata/android/en-US/title.txt` |
+| Short description | `fastlane/metadata/android/en-US/short_description.txt` |
+| Full description | `fastlane/metadata/android/en-US/full_description.txt` |
+| Release notes | `fastlane/metadata/android/en-US/changelogs/7.txt` |
+| Store icon, 512 × 512 RGBA PNG | `fastlane/metadata/android/en-US/images/icon.png` |
+| Feature graphic, 1024 × 500 RGB PNG | `fastlane/metadata/android/en-US/images/featureGraphic.png` |
+| Four phone screenshots, RGB PNG, 9:16 | `fastlane/metadata/android/en-US/images/phoneScreenshots/` |
+| Data safety / app-content answers | `publishing/DATA_SAFETY.md` |
+| Background-location answers and video script | `publishing/BACKGROUND_LOCATION.md` |
+| Contact details and remaining publisher choices | `publishing/console-details.json` |
+| Privacy policy | `PRIVACY.md`, also rendered as `docs/site/privacy.html` |
+| Data and software notices | `docs/DATA_NOTICES.txt` |
+
+The metadata directory follows [fastlane supply's format](https://docs.fastlane.tools/actions/supply/); it also works as a simple set of files for manual Console upload. No service-account credentials or upload automation are required. The title, descriptions, release notes, PNG colour modes, dimensions and checksums are checked by:
 
 ```sh
-./gradlew :tide-core:test :app:lintDebug :app:bundleRelease
+python3 tools/prepare_play_release.py --check-only
 ```
 
-The output is `app/build/outputs/bundle/release/app-release.aab`. Without an explicitly configured release signing key this bundle is unsigned. Use your own protected upload key and Play App Signing before uploading; do not use the debug key. Keep keystores and passwords out of Git. The package has no native `.so` libraries; its data reader uses the platform JVM/zlib. Confirm the application ID and final listing/developer identity in Play Console before the first upload.
+Graphics follow the [Play preview-asset requirements](https://support.google.com/googleplay/android-developer/answer/9866151?hl=en). Screenshots come from MainActivity on the connected phone at a fixed Tregde demonstration location. They capture app content only and clip the excess tall-phone viewport to 9:16 without stretching or UI overlays. The feature graphic uses the actual tide renderer and real EOT20 predictions; the icon renders the existing Android vector. See `publishing/asset-provenance.txt`. No tablet/TV/Wear screenshots are claimed.
 
-## Privacy and Data safety
+To regenerate on an authorized, unlocked USB phone with an existing TideLine debug install (JDK 17 / Android SDK 36):
 
-The canonical policy is `PRIVACY.md`, bundled in the app and rendered by `tools/render_privacy.py` into `docs/site/`. Both in-app document dialogs offer a **View on GitHub** button:
+```sh
+python3 tools/capture_play_assets.py
+```
 
-- Privacy policy: https://github.com/erikhardlyworking/tideline/blob/main/PRIVACY.md
-- Data and software notices: https://github.com/erikhardlyworking/tideline/blob/main/docs/DATA_NOTICES.txt
+This updates the debug/test APKs and opens a temporary fixed-location demo widget; it does not grant permissions or replace existing widget settings. Keep the phone unlocked. The test APK contains the capture code; it is not part of the release bundle.
 
-The repository is intentionally private during testing. Before submitting to Play, make the policy publicly accessible and verify its URL while signed out. After making the repository public, its policy URL above can be used as the repository-hosted link. A standalone HTML policy is also prepared in `docs/site/`; the manual Pages workflow can publish it after Pages is configured. Intended HTML URL: https://erikhardlyworking.github.io/tideline/privacy.html .
+## Build and sign
 
-For the current code, no user data is transmitted off-device by the app: there is no Internet permission, analytics, ad SDK, account or developer backend. Approximate location is accessed and the latest fix is saved locally; a fixed coordinate may be entered manually. The system location provider has its own device/OS settings. Describe this consistently in the policy and permission declarations. Data safety's collection questions distinguish off-device transmission from local processing; review the final binary and all dependencies before submitting the answers. No account-deletion endpoint is needed because TideLine has no accounts. Clearing app storage or uninstalling deletes local data.
+```sh
+./gradlew :tide-core:test :app:lintRelease :app:bundleRelease
+python3 tools/prepare_play_release.py
+```
 
-Google requires an accessible privacy policy and accurate Data safety disclosures: [User Data policy](https://support.google.com/googleplay/android-developer/answer/10144311?hl=en).
+The AAB is `app/build/outputs/bundle/release/app-release.aab`. Without upload credentials it is **unsigned and cannot be uploaded**. The packager labels it `UNSIGNED`, copies it with the listing and declarations into `dist/play/`, and creates a ZIP and checksum manifest. That unsigned package is useful for local review. File paths inside the ZIP mirror the source checkout; run build/capture commands in the source checkout, not in the extracted review package. Existing output snapshots are preserved; move an old output directory before rerunning the same version/status.
 
-## Background-location review
+To prepare the uploadable bundle:
 
-The optional following feature uses `ACCESS_COARSE_LOCATION` and `ACCESS_BACKGROUND_LOCATION`; it does not request fine location. Following is off by default. Before background permission setup, the primary location screen displays a dedicated disclosure explaining access while closed, the widget-following purpose, local storage and how to stop it. Approximate access suffices. Android 11+ uses the app's Permissions → Location settings to choose background access; refusing leaves other modes usable.
+1. Use your protected upload keystore, or create one in Android Studio's **Generate Signed Bundle / APK → Android App Bundle** flow. Choose a location outside this repository and back it up. This work has not created a production key or selected your Play App Signing identity.
+2. Copy `publishing/key.properties.example` to the project root as `key.properties`, and enter the four real values locally. The actual file and keystores are ignored by Git. Java properties escape backslashes, so use forward slashes in Windows paths.
+3. Rebuild and require signature verification:
 
-Complete the Play Console background-location declaration and provide the requested demonstration video showing the actual disclosure, permission flow and a widget following changed location. Record it on an Android device before submission. Explain the core benefit: the home-screen tide display remains relevant to the user's coast as they move without opening the app. Google reviews whether background access is justified; optional availability does not guarantee approval. [Google Play background-location requirements](https://support.google.com/googleplay/android-developer/answer/9799150?hl=en).
+```sh
+./gradlew :tide-core:test :app:lintRelease :app:bundleRelease
+python3 tools/prepare_play_release.py --require-signed
+```
 
-## Release tasks owned by the publisher
+Alternatively set all four environment variables: `TIDELINE_STORE_FILE`, `TIDELINE_STORE_PASSWORD`, `TIDELINE_KEY_ALIAS`, `TIDELINE_KEY_PASSWORD`. Partial signing configuration fails; release never falls back to a debug key. Do not put passwords on a command line or in Git. The packager verifies a present JAR signature, rejects the usual Android debug certificate, records the public upload-certificate fingerprint and copies no signing secrets. Google Play still checks the certificate against the identity registered in your account. See [Android app signing](https://developer.android.com/studio/publish/app-signing).
 
-- Verify the public policy URL and final contact/developer details.
-- Test the installed app with approximate-only location, background access allowed/denied/revoked, following switched off, fixed locations, travel, provider disabled, reboot and battery saving. The new callback's filtering is testable independently, but a real movement/reboot journey is still required.
-- Sign the AAB with the protected upload key, then use an internal/closed test track and any account-specific testing requirements shown by Play Console.
-- Supply final icon, feature graphic and representative screenshots; use real predictions and disclose approximation/weather exclusions in listing text.
-- Complete Data safety, app access, ads, content rating, target audience and background-location declarations according to the final app and intended audience.
+The validator checks the release package/version, non-debug manifest, target API 36, absence of Internet/fine-location permissions, exact bundled model/policy/notices and ZIP integrity. There are no native `.so` libraries in the current bundle. Review target API and any new Console requirements when submitting: [target API policy](https://support.google.com/googleplay/android-developer/answer/11926878?hl=en).
 
-The app targets API 36, meeting the published new-app target requirement as checked on 30 October 2026. Verify Play Console's requirements at submission: [target API requirements](https://support.google.com/googleplay/android-developer/answer/11926878?hl=en).
+## Finish in Play Console
+
+- Create/select `app.tideline`, English (United States), app name TideLine. Suggested category: Weather. Confirm the package ID before the first upload.
+- Use workinghardlyforyou@gmail.com as the public support email. Choose pricing, distribution countries and intended age groups in `publishing/console-details.json`. Complete the IARC questionnaire in Console; this package does not assign a content rating. There are no ads, accounts, purchases or login restrictions in the current app.
+- Upload the signed AAB to an internal/closed test track with Play App Signing. Complete any account-specific testing requirements before production.
+- Upload the listing text, icon, feature graphic and four phone screenshots above.
+- Make the privacy policy publicly readable and test its URL while signed out. The repository remains deliberately **private during testing**. Intended repository URL: https://github.com/erikhardlyworking/tideline/blob/main/PRIVACY.md . A private link is insufficient for submission. The optional manual Pages workflow can instead host `docs/site/privacy.html` once configured.
+- Complete Data safety and app-content declarations using the worksheets after reviewing the final app/dependencies. Current local processing does not send user data off-device. See the [User Data policy](https://support.google.com/googleplay/android-developer/answer/10144311?hl=en).
+- Finish the real approximate/background-location journey tests (allow/deny/revoke, following off, travel, disabled provider, reboot and battery saving). Record the disclosure, permission flow and working background widget for the [background-location review](https://support.google.com/googleplay/android-developer/answer/9799150?hl=en), and add its accessible video URL. The draft script is provided; no review video or Play approval is claimed.
+
+The generated `release-report.json` states signing status and outstanding publisher steps. Creating a local package never publishes the app or changes repository visibility.

@@ -1,0 +1,6 @@
+TideLine 0.2.3 (7)
+Icon: unmodified ic_tide Android vector, rendered at 512 px.
+Feature: native Canvas and real 12-hour ChartRenderer/EOT20 forecast, Tregde 58.006377,7.554759; 1793361600000 UTC milliseconds.
+Screenshots: native MainActivity content, fixed Tregde demo widget 99993, current calculation time, Europe/Oslo process time zone.
+Only bottom clipping to 9:16; no rescaling, UI replacement or text overlays. No user widget preferences or permissions changed.
+Device: samsung SM-S938B, API 37.

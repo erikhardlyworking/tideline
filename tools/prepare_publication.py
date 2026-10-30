@@ -5,9 +5,13 @@ import shutil
 
 ROOT = Path(__file__).resolve().parents[1]
 ROOT_FILES = ['README.md','PRIVACY.md','LICENSE','.gitignore','settings.gradle.kts','build.gradle.kts','gradle.properties','gradlew','gradlew.bat','requirements.lock.txt']
-DIRECTORIES = ['app','tide-core','tide-cli','gradle','tools','docs','.github']
-REPORTS = ['REPORT.md','REPORT.html','INTERPOLATION.md','android_data_manifest.json','kotlin_validation.json','kotlin_location_validation.json']
-EXCLUDE = {'build','.gradle','__pycache__','.idea','.git'}
+DIRECTORIES = ['app','tide-core','tide-cli','gradle','tools','docs','.github','fastlane','publishing']
+REPORTS = ['REPORT.md','REPORT.html','INTERPOLATION.md','android_data_manifest.json','kotlin_validation.json','kotlin_location_validation.json','play_preparation.json']
+EXCLUDE = {'build','.gradle','__pycache__','.idea','.git','local'}
+
+def private_file(path):
+    return (path.name in {'key.properties', 'play-service-account.json'} or
+            path.name.startswith('.env') or path.suffix.lower() in {'.jks', '.keystore', '.p12', '.pfx', '.key'})
 
 def main():
     parser = argparse.ArgumentParser()
@@ -24,7 +28,7 @@ def main():
     for name in ROOT_FILES: copy(Path(name))
     for directory in DIRECTORIES:
         for path in (ROOT/directory).rglob('*'):
-            if path.is_file() and not any(part in EXCLUDE for part in path.relative_to(ROOT/directory).parts):
+            if path.is_file() and not private_file(path) and not any(part in EXCLUDE for part in path.relative_to(ROOT/directory).parts):
                 copy(path.relative_to(ROOT))
     for report in REPORTS: copy(Path('results')/report)
     copy(Path('data/packs/tideline-global.tpk'))

@@ -21,13 +21,29 @@ import java.time.Instant
 
 /** Native device checks: installed data, real predictions, renderer and detail activity. */
 class WidgetInstrumentation : Instrumentation() {
+    private var exportStoreAssets = false
     private fun onUi(action: () -> Unit) {
         var error: Throwable? = null
         runOnMainSync { try { action() } catch (failure: Throwable) { error = failure } }
         error?.let { throw it }
     }
-    override fun onCreate(arguments: Bundle?) { super.onCreate(arguments); start() }
+    override fun onCreate(arguments: Bundle?) {
+        exportStoreAssets = arguments?.getString("storeAssets") == "true"
+        super.onCreate(arguments); start()
+    }
     override fun onStart() {
+        if (exportStoreAssets) {
+            val result = Bundle()
+            try {
+                PlayStoreAssets(this).export()
+                result.putString("result", "Play assets captured from the real app at a fixed demonstration location; user widget settings and location permissions retained")
+                finish(Activity.RESULT_OK, result)
+            } catch (error: Throwable) {
+                result.putString("failure", error.stackTraceToString())
+                finish(Activity.RESULT_CANCELED, result)
+            }
+            return
+        }
         val output = Bundle()
         val store = SettingsStore(targetContext)
         var activity: Activity? = null

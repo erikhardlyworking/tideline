@@ -2,7 +2,7 @@
 
 Effective date: 30 October 2026
 
-TideLine is developed by erikhardlyworking. Privacy questions can be submitted through https://github.com/erikhardlyworking/tideline/issues. Please do not put private location details in a public issue.
+TideLine is developed by erikhardlyworking. For privacy questions or support, email workinghardlyforyou@gmail.com. You can also report issues through https://github.com/erikhardlyworking/tideline/issues. Please do not put private location details in a public issue.
 
 ## What stays on your device
 
@@ -20,7 +20,7 @@ TideLine requests occasional network/passive system locations, not continuous GP
 
 Settings and the latest fix are kept in Android's app-private storage. App backup is disabled. Data remains until replaced, its widget is removed, or you clear app storage or uninstall TideLine. Removing a widget deletes that widget's settings; app-wide new-widget defaults may retain the latest selected location. Clear app storage or uninstall to remove all TideLine settings and saved locations. You can revoke location permissions through Android settings at any time. A revoked permission prevents future access; it does not automatically erase an already saved fix.
 
-There are no TideLine accounts or remote records to delete. If you contact the developer through GitHub, GitHub processes that communication under its own privacy policy. Opening external links uses your browser or another app, separately from TideLine's offline calculations.
+There are no TideLine accounts or remote records to delete. If you contact the developer by email, your email address and the information you choose to send are used to respond to your inquiry, and retained only as needed for support and related records. Do not include private location details unless needed for the issue. Email providers process that communication under their own policies. If you contact the developer through GitHub, GitHub processes that communication under its own privacy policy. Opening external links uses your browser or another app, separately from TideLine's offline calculations.
 
 ## Changes
 

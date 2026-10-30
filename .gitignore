@@ -20,6 +20,11 @@ local.properties
 .aws/
 *.jks
 *.keystore
+*.p12
+*.pfx
 key.properties
 .env
 .env.*
+play-service-account.json
+publishing/local/
+dist/

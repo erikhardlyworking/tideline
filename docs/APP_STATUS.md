@@ -4,6 +4,8 @@ Implemented 30 October 2026 from the widget description and visual preferences. 
 
 ## Behaviour
 
+Play publication files are now prepared under `fastlane/metadata/android/en-US/` and `publishing/`: English listing/release notes, a 512 px icon, 1024×500 feature graphic, four real 9:16 app-content screenshots, Data safety worksheet, background-location declaration/video script, and Console details using workinghardlyforyou@gmail.com. Native test-only capture uses a temporary fixed Tregde demo location. The release supports an explicitly configured upload key and never falls back to debug signing. `tools/prepare_play_release.py` validates and packages the AAB with hashes; `--require-signed` refuses unsigned/debug-signed bundles. See `docs/PLAY_STORE.md`. No production key, Play submission or review video has been created. The policy remains private on GitHub until the owner changes repository visibility.
+
 Version 0.2.3 adds a general **More apps on Google Play** button in About, linking to the developer page, and removes the specific reference to another widget from these notes and the bundled notices. Data/software licence attribution remains intact.
 
 Version 0.2.2 adds **View on GitHub** to the privacy policy and data/software notice dialogs, retaining the bundled documents for offline reading. The targets are the repository's `main/PRIVACY.md` and `main/docs/DATA_NOTICES.txt`. README/Play notes include the same URLs. The repository stays private during testing, so anonymous access is intentionally pending its later visibility change.
