@@ -37,3 +37,6 @@ dist/
 /docs/PLAY_STORE.md
 /docs/STORE_LISTING.md
 /docs/RESEARCH.md
+
+# Builds and checks run locally through Codex.
+/.github/workflows/

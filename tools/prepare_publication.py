@@ -5,7 +5,7 @@ import shutil
 
 ROOT = Path(__file__).resolve().parents[1]
 ROOT_FILES = ['README.md','PRIVACY.md','LICENSE','.gitignore','settings.gradle.kts','build.gradle.kts','gradle.properties','gradlew','gradlew.bat','requirements.lock.txt','key.properties.example']
-DIRECTORIES = ['app','tide-core','tide-cli','gradle','.github']
+DIRECTORIES = ['app','tide-core','tide-cli','gradle']
 SOURCE_FILES = [
     'docs/DATA_NOTICES.txt', 'docs/PYTMD_LICENSE.txt',
     'docs/site/index.html', 'docs/site/privacy.html',

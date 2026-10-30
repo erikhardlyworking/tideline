@@ -44,7 +44,7 @@ Windows can use `gradlew.bat` or `python tools/task.py build`. Outputs:
 
 The release bundle is unsigned unless you configure your own protected upload key. Copy [key.properties.example](key.properties.example) to `key.properties` and enter the keystore path, passwords and alias locally. Alternatively supply all four environment variables: `TIDELINE_STORE_FILE`, `TIDELINE_STORE_PASSWORD`, `TIDELINE_KEY_ALIAS`, `TIDELINE_KEY_PASSWORD`. Keystores and the actual properties file are ignored by Git. Incomplete configuration fails; release signing never falls back to the debug key.
 
-`tide-core` contains the shared Kotlin calculation, data and timeline code; `tide-cli` exercises it off-device; `app` contains the Android widget, settings and location handling. GitHub Actions runs the source checks and builds. Native phone checks use a fixed demonstration location:
+`tide-core` contains the shared Kotlin calculation, data and timeline code; `tide-cli` exercises it off-device; `app` contains the Android widget, settings and location handling. Builds and checks run locally through Codex or the commands above. Native phone checks use a fixed demonstration location:
 
 ```sh
 adb install --user 0 -r app/build/outputs/apk/debug/app-debug.apk
@@ -67,7 +67,7 @@ The privacy policy and licence notices are bundled for offline reading. The app'
 - [Privacy policy](https://github.com/erikhardlyworking/tideline/blob/main/PRIVACY.md)
 - [Data and software notices](https://github.com/erikhardlyworking/tideline/blob/main/docs/DATA_NOTICES.txt)
 
-A standalone HTML copy of the policy is maintained in `docs/site/`. Regenerate it with `python3 tools/render_privacy.py`. To host it with GitHub Pages, enable Pages with GitHub Actions and run the manual **Publish privacy page** workflow.
+A standalone HTML copy of the policy is maintained in `docs/site/`. Regenerate it locally with `python3 tools/render_privacy.py`; the repository links above provide the policy and notices on GitHub.
 
 For support or privacy inquiries, email workinghardlyforyou@gmail.com. Bugs can also be reported through the repository's Issues page. Avoid putting private location details in public issues.
 
