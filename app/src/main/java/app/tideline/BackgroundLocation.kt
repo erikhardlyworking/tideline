@@ -14,6 +14,10 @@ object BackgroundLocation {
     private const val ACTION = "app.tideline.APPROXIMATE_LOCATION"
     fun permitted(context: Context): Boolean = context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED &&
         (Build.VERSION.SDK_INT < 29 || context.checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED)
+    private fun activeIds(context: Context): IntArray {
+        val store = SettingsStore(context)
+        return WidgetUpdates.ids(context).filter { store.get(it).let { value -> value.followCurrent && value.backgroundFollow } }.toIntArray()
+    }
 
     private fun callback(context: Context): PendingIntent = PendingIntent.getBroadcast(context, 401,
         Intent(context, BackgroundLocationReceiver::class.java).setAction(ACTION),
@@ -23,8 +27,7 @@ object BackgroundLocation {
     @SuppressLint("MissingPermission") // Permission and per-widget opt-in checked before registration/read.
     fun sync(context: Context, force: Boolean = false) {
         val manager = context.getSystemService(LocationManager::class.java)
-        val store = SettingsStore(context)
-        val enabled = permitted(context) && WidgetUpdates.ids(context).any { id -> store.get(id).let { it.followCurrent && it.backgroundFollow } }
+        val enabled = permitted(context) && activeIds(context).isNotEmpty()
         val providers = listOf(LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER)
             .filter { try { manager.isProviderEnabled(it) } catch (_: Exception) { false } }
         val signature = if (enabled) providers.joinToString(",") else ""
@@ -45,11 +48,13 @@ object BackgroundLocation {
     @SuppressLint("MissingPermission") // Both permissions checked; only opt-in widgets accept a fix.
     fun refreshCached(context: Context) {
         if (!permitted(context)) return
+        val ids = activeIds(context)
+        if (ids.isEmpty()) return
         val manager = context.getSystemService(LocationManager::class.java)
         val latest = listOf(LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER).mapNotNull {
             try { manager.getLastKnownLocation(it) } catch (_: Exception) { null }
         }.maxByOrNull { it.time } ?: return
-        storeFix(context, intArrayOf(0, *WidgetUpdates.ids(context)), latest)
+        storeFix(context, intArrayOf(0, *ids), latest)
     }
 
     internal fun storeFix(context: Context, ids: IntArray, location: Location) {
@@ -67,11 +72,13 @@ object BackgroundLocation {
 
     fun receive(context: Context, intent: Intent) {
         if (intent.action != ACTION || !permitted(context)) return
+        val ids = activeIds(context)
+        if (ids.isEmpty()) return
         @Suppress("DEPRECATION")
         val location = if (Build.VERSION.SDK_INT >= 33) intent.getParcelableExtra(LocationManager.KEY_LOCATION_CHANGED, Location::class.java)
             else intent.getParcelableExtra<Location>(LocationManager.KEY_LOCATION_CHANGED)
         if (location != null) {
-            storeFix(context, intArrayOf(0, *WidgetUpdates.ids(context)), location)
+            storeFix(context, intArrayOf(0, *ids), location)
             WidgetUpdates.enqueue(context)
         }
     }
