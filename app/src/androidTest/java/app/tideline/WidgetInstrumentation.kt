@@ -62,6 +62,8 @@ class WidgetInstrumentation : Instrumentation() {
             val inland = TideRepository.snapshot(context, settings.copy(latitude = 52.52, longitude = 13.405), now)
             check(inland.signal == null && inland.coverageProblem == app.tideline.core.LocationProblem.TOO_FAR_FROM_COAST)
             val outputDirectory = File(context.filesDir, "device-checks").apply { mkdirs() }
+            val inlandImage = ChartRenderer.bitmap(context, 320, 142, settings, inland)
+            FileOutputStream(File(outputDirectory, "inland.png")).use { inlandImage.compress(Bitmap.CompressFormat.PNG, 100, it) }
             for (theme in 0..2) {
                 val style = settings.copy().apply { theme(theme) }
                 for ((index, size) in listOf(130 to 64, 320 to 142, 400 to 100, 180 to 240).withIndex()) {

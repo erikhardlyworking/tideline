@@ -37,6 +37,15 @@ object ChartRenderer {
         paint.textSize = textSize
         val left = padding
         val right = width - padding
+        if (tide.signal == null) {
+            paint.textAlign = Paint.Align.CENTER
+            paint.color = s.foreground
+            paint.textSize = min(13 * dp * fontScale, width / 16f)
+            val message = context.getString(if (tide.needsLocation) R.string.choose_location else if (tide.coverageProblem == LocationProblem.TOO_FAR_FROM_COAST) R.string.too_far_from_coast else R.string.unavailable)
+            paint.textSize *= min(1f, (right - left) / paint.measureText(message))
+            canvas.drawText(message, width / 2f, axis - (paint.ascent() + paint.descent()) / 2, paint)
+            return
+        }
         val markLeft = right - 8 * dp
         val labelRight = markLeft - 4 * dp
         val labelHalf = (paint.descent() - paint.ascent()) / 2
@@ -108,15 +117,6 @@ object ChartRenderer {
                 occupied += RectF(rect).apply { inset(-3 * dp, 0f) }
             }
             paint.typeface = Typeface.create("sans-serif", Typeface.NORMAL)
-        }
-        if (tide.signal == null) {
-            drawTimeLabels()
-            paint.textAlign = Paint.Align.CENTER
-            paint.textSize = min(13 * dp * fontScale, width / 16f)
-            val message = context.getString(if (tide.needsLocation) R.string.choose_location else if (tide.coverageProblem == LocationProblem.TOO_FAR_FROM_COAST) R.string.too_far_from_coast else R.string.unavailable)
-            paint.textSize *= min(1f, (right - left) / paint.measureText(message))
-            canvas.drawText(message, width / 2f, axis - 10 * dp, paint)
-            return
         }
         val samples = tide.samples(hours, (width / dp * 2).roundToInt().coerceIn(100, 1000)) ?: return
         val ys = FloatArray(samples.size) { heightY(samples[it]) }
