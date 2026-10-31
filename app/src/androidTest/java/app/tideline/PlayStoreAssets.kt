@@ -85,7 +85,7 @@ class PlayStoreAssets(private val runner: Instrumentation) {
                 runner.waitForIdleSync()
                 onUi {
                     val content = screen.findViewById<ViewGroup>(android.R.id.content)
-                    ready = content.isShown && texts(content).any { it.text.contains("km from requested location") }
+                    ready = content.isShown && texts(content).any { it.text.contains("Distance to nearest tide cell:") }
                 }
                 if (ready) break
                 Thread.sleep(100)
@@ -100,7 +100,7 @@ class PlayStoreAssets(private val runner: Instrumentation) {
                     val top = if (widgetAtTop) {
                         (0 until column.childCount).map { column.getChildAt(it) }.filterIsInstance<android.widget.ImageView>().first().top
                     } else target?.parent?.let { (it as View).top } ?: 0
-                    scroll.scrollTo(0, top)
+                    scroll.scrollTo(0, (top - (24 * screen.resources.displayMetrics.density).toInt()).coerceAtLeast(0))
                 }
                 runner.waitForIdleSync()
                 onUi {
@@ -115,7 +115,7 @@ class PlayStoreAssets(private val runner: Instrumentation) {
                     save("phoneScreenshots/$name.png", image)
                 }
             }
-            capture("01-widget-and-tide", widgetAtTop = true)
+            capture("01-widget-and-tide")
             capture("02-day-forecast", R.string.forecast_details)
             capture("03-fixed-location", R.string.location)
             capture("04-appearance", R.string.appearance)

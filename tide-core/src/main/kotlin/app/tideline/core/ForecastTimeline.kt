@@ -9,7 +9,7 @@ data class ClockTick(val epochMillis: Long, val wholeHour: Boolean, val minute: 
 object ForecastTimeline {
     fun ticks(startMillis: Long, hours: Int, zone: ZoneId): List<ClockTick> {
         require(hours in 1..24)
-        val minutes = when { hours <= 4 -> 20; hours <= 6 -> 30; hours <= 12 -> 60; else -> 120 }
+        val minutes = when { hours <= 6 -> 15; hours <= 12 -> 30; else -> 120 }
         val local = Instant.ofEpochMilli(startMillis).atZone(zone)
         var at = local.withSecond(0).withNano(0)
         val end = startMillis + hours * 3_600_000L

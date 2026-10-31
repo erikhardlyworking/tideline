@@ -8,9 +8,6 @@ import android.net.Uri
 import android.os.Bundle
 import android.widget.RemoteViews
 import androidx.work.*
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit
 
 class TideWidgetProvider : AppWidgetProvider() {
@@ -53,10 +50,9 @@ class TideWidgetProvider : AppWidgetProvider() {
         }
         fun description(context: Context, settings: WidgetSettings, tide: TideSnapshot): String {
             if (tide.signal == null) return tide.error ?: context.getString(R.string.unavailable)
-            val format = DateTimeFormatter.ofPattern("HH:mm z").withZone(ZoneId.systemDefault())
-            fun event(value: app.tideline.core.TideEvent?) = value?.let { format.format(Instant.ofEpochMilli(it.epochMillis)) + ", " + ChartRenderer.cm(it.metres) } ?: context.getString(R.string.no_extremum)
+            fun event(value: app.tideline.core.TideEvent?) = value?.let { PhoneFormats.dateTime(context, it.epochMillis) + ", " + ChartRenderer.cm(it.metres) } ?: context.getString(R.string.no_extremum)
             return context.getString(R.string.widget_accessibility, tide.label,
-                format.format(Instant.ofEpochMilli(tide.startMillis)) + "–" + format.format(Instant.ofEpochMilli(tide.startMillis + settings.hours * 3_600_000L)),
+                PhoneFormats.time(context, tide.startMillis) + "–" + PhoneFormats.time(context, tide.startMillis + settings.hours * 3_600_000L),
                 ChartRenderer.cm(tide.currentMetres), context.getString(if (tide.slope > .01) R.string.rising else if (tide.slope < -.01) R.string.falling else R.string.turning),
                 event(tide.nextHigh), event(tide.nextLow))
         }

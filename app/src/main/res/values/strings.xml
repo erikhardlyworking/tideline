@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">TideLine</string>
     <string name="widget_description">An offline tide curve with a central time line.</string>
-    <string name="tagline">A quiet view of the tide ahead.</string>
+    <string name="tagline">Offline, slightly imprecise tide forecast</string>
     <string name="location">Location</string>
     <string name="set_location">Set location</string>
     <string name="specific_location">Specific location</string>
@@ -29,7 +29,6 @@
     <string name="hue">Hue</string>
     <string name="hex_colour">Hex colour (#AARRGGBB)</string>
     <string name="invalid_colour">Enter #RRGGBB or #AARRGGBB.</string>
-    <string name="corner_radius">Rounded corners</string>
     <string name="padding">Left and right padding</string>
     <string name="vertical_padding">Top and bottom padding</string>
     <string name="line_width">Line thickness</string>
@@ -54,7 +53,7 @@
     <string name="location_searching">Finding your location…</string>
     <string name="location_failed">No location fix yet. Try again or set a fixed location.</string>
     <string name="location_stored">Uses your last saved fix. Open TideLine to update it when you move.</string>
-    <string name="too_far_from_coast">Too far from the coast</string>
+    <string name="too_far_from_coast">Too far from coast</string>
     <string name="background_follow">Follow movement in background</string>
     <string name="background_disclosure">TideLine accesses your approximate location in the background, including when the app is closed, to move your tide widget with you. Only the latest location is saved on this device. It is not sent to us or shared for advertising. Updates are occasional and can be delayed by Android. You can turn following off at any time; fixed locations and manual refresh still work.</string>
     <string name="not_now">Not now</string>
@@ -65,7 +64,7 @@
     <string name="background_off">Background following is off. Your last fix is retained until you open the app or refresh.</string>
     <string name="background_permission_missing">Following is selected but paused: background location permission is missing. Turn following off and on to reopen permission setup.</string>
     <string name="location_following">Automatic following uses occasional approximate system locations. The latest saved fix is used between updates. Android battery settings and location availability can delay updates.</string>
-    <string name="refresh_explanation">The widget refreshes approximately every 15 minutes; Android may delay it longer, especially during sleep or battery saving. It is not a live clock. The bottom-left time and height are from the last update. The main time line labels whole hours; short ticks mark 20 minutes in the 2–4 hour views. Background following is optional and also updates occasionally. Open the app or tap Refresh for an immediate calculation.</string>
+    <string name="refresh_explanation">The widget refreshes approximately every 15 minutes; Android may delay it during sleep or battery saving. It is not a live clock. The centred time and height are from the last update. Background following is optional and also updates occasionally. Open the app or tap Refresh for an immediate calculation.</string>
     <string name="privacy_policy">Privacy policy</string>
     <string name="view_on_github">View on GitHub</string>
     <string name="no_browser">No app is available to open this link.</string>
@@ -74,9 +73,9 @@
     <string name="privacy_policy_url" translatable="false">https://github.com/erikhardlyworking/tideline/blob/main/PRIVACY.md</string>
     <string name="notices_url" translatable="false">https://github.com/erikhardlyworking/tideline/blob/main/docs/DATA_NOTICES.txt</string>
     <string name="astronomical_note">Approximate astronomical tide. Weather effects excluded.</string>
-    <string name="datum_note">Heights are centimetres relative to the model’s mean sea level. The middle line is zero. Right-hand marks show the next 24-hour maximum and minimum at their heights on the graph; the bottom-left time shows when its height was calculated.</string>
+    <string name="datum_note">Heights are centimetres relative to the model’s mean sea level. The middle line is zero. Right-hand marks show the next 24-hour maximum or minimum on the sides used by the visible curve. The centred time shows when its height was calculated.</string>
     <string name="model_location">Model location</string>
-    <string name="model_support">%1$s · %2$.1f km from requested location</string>
+    <string name="model_distance">Distance to nearest tide cell: %1$.1f km</string>
     <string name="location_age">Location fix: %1$s · accuracy about %2$d m</string>
     <string name="hourly_detail">The next 24 hours</string>
     <string name="forecast_details">Tide details</string>

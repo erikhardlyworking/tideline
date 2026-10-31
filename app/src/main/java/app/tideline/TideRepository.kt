@@ -37,16 +37,16 @@ data class TideSnapshot(
     val nextLow: TideEvent? = null,
     val error: String? = null,
     val coverageProblem: LocationProblem? = null,
-    val needsLocation: Boolean = false
+    val needsLocation: Boolean = false,
+    val nearestCellDistanceKm: Double? = modelLocation?.nearestCellDistanceKm
 ) {
     fun samples(hours: Int, count: Int): DoubleArray? = signal?.let { s -> DoubleArray(count) { i -> s.height(startMillis + i * hours * 3_600_000L / (count - 1)) } }
 }
 
 object TideRepository {
-    private data class LocationQuery(val point: GeoPoint, val shoreLimitKm: Double)
     @Volatile private var model: TideModel? = null
-    private val locations = object : LinkedHashMap<LocationQuery, LocationResult>(8, .75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<LocationQuery, LocationResult>?) = size > 8
+    private val locations = object : LinkedHashMap<GeoPoint, LocationResult>(8, .75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<GeoPoint, LocationResult>?) = size > 8
     }
     @Synchronized private fun model(context: Context): TideModel = model ?: TideModel(ModelPack(AssetSource(context.applicationContext.assets.openFd("tideline-global.tpk")))).also { model = it }
 
@@ -54,9 +54,10 @@ object TideRepository {
         val point = settings.point() ?: return TideSnapshot(at, "", error = context.getString(R.string.choose_location), needsLocation = true)
         return try {
             val model = model(context)
-            val query = LocationQuery(point, if (settings.followCurrent) (settings.accuracy / 1000.0 + 1).coerceIn(1.0, 5.0) else 1.0)
-            val located = locations[query] ?: model.locate(point, query.shoreLimitKm).also { locations[query] = it }
-            if (located is LocationResult.Unavailable) TideSnapshot(at, settings.label(), error = located.reason, coverageProblem = located.problem)
+            val located = locations[point] ?: model.locate(point).also { locations[point] = it }
+            if (located is LocationResult.Unavailable) TideSnapshot(at, settings.label(),
+                error = if (located.problem == LocationProblem.TOO_FAR_FROM_COAST) context.getString(R.string.too_far_from_coast) else context.getString(R.string.unavailable),
+                coverageProblem = located.problem, nearestCellDistanceKm = located.nearestCellDistanceKm)
             else {
                 val support = (located as LocationResult.Available).location
                 val signal = model.signal(support)

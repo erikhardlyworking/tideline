@@ -4,9 +4,7 @@ import android.content.Context
 import android.graphics.*
 import app.tideline.core.ForecastTimeline
 import app.tideline.core.LocationProblem
-import java.time.Instant
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import kotlin.math.*
 
 /** Optional render evidence used by device checks, recorded from the actual drawing layout. */
@@ -15,11 +13,11 @@ class ChartAudit {
     data class Guide(val y: Float, val left: Float, val right: Float)
     val labels = mutableListOf<Label>()
     val guides = mutableListOf<Guide>()
+    data class Tick(val minute: Int, val length: Float)
+    val ticks = mutableListOf<Tick>()
 }
 
 object ChartRenderer {
-    private val time = DateTimeFormatter.ofPattern("HH:mm")
-    private val hour = DateTimeFormatter.ofPattern("H")
     private data class ClockLabel(val text: String, val main: String, val suffix: String, val size: Float,
         val mainWidth: Float, val bounds: RectF, val baseline: Float)
 
@@ -37,12 +35,12 @@ object ChartRenderer {
     private fun draw(context: Context, canvas: Canvas, width: Int, height: Int, dp: Float, s: WidgetSettings, tide: TideSnapshot, hours: Int, audit: ChartAudit?) {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         paint.color = s.background
-        canvas.drawRoundRect(0f, 0f, width.toFloat(), height.toFloat(), min(s.radius * dp, height / 2f), min(s.radius * dp, height / 2f), paint)
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
         val fontScale = context.resources.configuration.fontScale.coerceIn(1f, 1.6f)
         val compact = height / dp < 100
         val padding = min(s.padding * dp, min(width / 8f, height / (if (compact) 12f else 7f)))
         val verticalPadding = min(s.verticalPadding * dp, height / 4f)
-        val textSize = min((if (compact) 9.5f else 11f) * dp * fontScale * s.labelScale, (height - 2 * verticalPadding) * .28f)
+        val textSize = min((if (compact) 9.5f else 11f) * dp * fontScale * s.labelScale, (height - 2 * verticalPadding) * .24f)
         val tickScale = min(dp * s.labelScale, height / 40f)
         val axis = height * .5f
         val left = padding; val right = width - padding
@@ -57,39 +55,46 @@ object ChartRenderer {
             canvas.drawText(message, width / 2f, axis - (paint.ascent() + paint.descent()) / 2, paint)
             return
         }
+        val samples = tide.samples(hours, (width / dp * 2).roundToInt().coerceIn(100, 1000)) ?: return
+        val levelIndices = listOf(0, 1).filter { index ->
+            if (index == 0) samples.any { it > 0 } else samples.any { it < 0 }
+        }.ifEmpty { listOf(0) }
         val secondary = subdued(s.foreground)
+        paint.typeface = normal; paint.textSize = textSize * .8f
+        val updated = PhoneFormats.time(context, tide.startMillis)
+        val now = context.getString(R.string.height_at_update, updated, cm(tide.currentMetres))
+        val footerSpace = max(dp, right - left - 12 * dp)
+        paint.textSize *= min(1f, footerSpace / paint.measureText(now))
+        val nowSize = paint.textSize
+        val nowBaseline = height - verticalPadding - paint.descent()
+        val nowLeft = (width - paint.measureText(now)) / 2
+        val nowRect = RectF(nowLeft, nowBaseline + paint.ascent(), nowLeft + paint.measureText(now), nowBaseline + paint.descent())
+
+        paint.typeface = medium; paint.textSize = textSize
         val markLeft = right - 8 * dp; val labelRight = markLeft - 4 * dp
         val labelHalf = (paint.descent() - paint.ascent()) / 2
         val half = max(dp, axis - verticalPadding - labelHalf)
         fun heightY(metres: Double) = axis - (metres / tide.scaleMetres).toFloat().coerceIn(-1f, 1f) * half
-        val maximumY = heightY(tide.maximum24); val minimumY = heightY(tide.minimum24)
+        val allValues = listOf(tide.maximum24, tide.minimum24)
+        val actualYs = levelIndices.map { heightY(allValues[it]) }
+        val topCentre = verticalPadding + labelHalf
+        val bottomCentre = max(topCentre, nowRect.top - 2 * dp - labelHalf)
         val separation = labelHalf * 2 + 2 * dp
-        val middle = ((maximumY + minimumY) / 2).coerceIn(verticalPadding + labelHalf + separation / 2, height - verticalPadding - labelHalf - separation / 2)
-        val levelYs = listOf(if (minimumY - maximumY < separation) middle - separation / 2 else maximumY,
-            if (minimumY - maximumY < separation) middle + separation / 2 else minimumY)
-        val levelTexts = listOf(cm(tide.maximum24), cm(tide.minimum24))
+        var levelYs = actualYs.map { it.coerceIn(topCentre, bottomCentre) }
+        if (levelYs.size == 2 && levelYs[1] - levelYs[0] < separation) {
+            val middle = ((levelYs[0] + levelYs[1]) / 2)
+                .coerceIn(topCentre + separation / 2, bottomCentre - separation / 2)
+            levelYs = listOf(middle - separation / 2, middle + separation / 2)
+        }
+        val levelTexts = levelIndices.map { cm(allValues[it]) }
         val levelBaselines = levelYs.map { it - (paint.ascent() + paint.descent()) / 2 }
         val levelRects = levelTexts.indices.map { i ->
             RectF(labelRight - paint.measureText(levelTexts[i]), levelBaselines[i] + paint.ascent(), labelRight, levelBaselines[i] + paint.descent())
         }
-        paint.typeface = normal; paint.textSize = textSize * .8f
-        val zone = ZoneId.systemDefault()
-        val updated = time.format(Instant.ofEpochMilli(tide.startMillis).atZone(zone))
-        val now = context.getString(R.string.height_at_update, updated, cm(tide.currentMetres))
-        val corner = min(s.radius * dp, height / 2f)
-        val footerLeft = max(left + 6 * dp, corner)
-        val footerRight = min(right, width - corner)
-        var nowBaseline = height - verticalPadding - paint.descent()
-        val available = levelRects.filter { it.top < nowBaseline + paint.descent() && it.bottom > nowBaseline + paint.ascent() }
-            .minOfOrNull { it.left - footerLeft - 6 * dp } ?: (footerRight - footerLeft)
-        paint.textSize *= min(1f, max(dp, available) / paint.measureText(now))
-        val nowSize = paint.textSize
-        nowBaseline = height - verticalPadding - paint.descent()
-        val nowRect = RectF(footerLeft, nowBaseline + paint.ascent(), footerLeft + paint.measureText(now), nowBaseline + paint.descent())
         val blocked = (levelRects + nowRect).map { RectF(it).apply { inset(-3 * dp, -2 * dp) } }
+        val zone = ZoneId.systemDefault()
         val ticks = ForecastTimeline.ticks(tide.startMillis, hours, zone)
         fun tickX(at: Long) = left + (right - left) * ((at - tide.startMillis).toDouble() / (hours * 3_600_000L)).toFloat()
-        val samples = tide.samples(hours, (width / dp * 2).roundToInt().coerceIn(100, 1000)) ?: return
         val ys = FloatArray(samples.size) { heightY(samples[it]) }
         val dx = (right - left) / (samples.size - 1)
         val clocks = mutableListOf<ClockLabel>()
@@ -119,14 +124,15 @@ object ChartRenderer {
         val clockSize = textSize * .87f
         var preferAbove = true
         for (tick in ticks.filter { it.wholeHour }) {
-            val at = Instant.ofEpochMilli(tick.epochMillis).atZone(zone)
-            val main = hour.format(at); val x = tickX(tick.epochMillis)
-            val full = candidate(main, ":00", x, preferAbove, clockSize)
+            val x = tickX(tick.epochMillis)
+            val fullParts = PhoneFormats.hour(context, tick.epochMillis, true)
+            val shortParts = PhoneFormats.hour(context, tick.epochMillis, false)
+            val full = candidate(fullParts.main, fullParts.suffix, x, preferAbove, clockSize)
             val wideEnough = (right - left) / hours >= full.bounds.width() + 18 * dp
             placed@ for (avoidCurve in listOf(true, false)) {
-                for (suffix in if (wideEnough) listOf(":00", "") else listOf("")) {
+                for (parts in if (wideEnough) listOf(fullParts, shortParts).distinct() else listOf(shortParts)) {
                     for (above in listOf(preferAbove, !preferAbove)) {
-                        val label = candidate(main, suffix, x, above, clockSize)
+                        val label = candidate(parts.main, parts.suffix, x, above, clockSize)
                         if (fits(label) && (!avoidCurve || !crossesCurve(label))) { clocks += label; preferAbove = !above; break@placed }
                     }
                 }
@@ -144,8 +150,7 @@ object ChartRenderer {
             for ((a,b) in cuts) { segment(a); from = max(from, b) }
             segment(right)
         }
-        horizontal(maximumY, withAlpha(secondary, 155), .45f * dp, true)
-        horizontal(minimumY, withAlpha(secondary, 155), .45f * dp, true)
+        for (y in actualYs) horizontal(y, withAlpha(secondary, 155), .45f * dp, true)
         if (s.guides) {
             horizontal(axis - half * .5f, withAlpha(s.foreground, 28), .45f * dp)
             horizontal(axis + half * .5f, withAlpha(s.foreground, 28), .45f * dp)
@@ -157,7 +162,9 @@ object ChartRenderer {
         for (tick in ticks) {
             val x = tickX(tick.epochMillis)
             if (x - left <= 3 * dp) continue
-            canvas.drawLine(x, axis - (if (tick.wholeHour) 4 else 2) * tickScale, x, axis + (if (tick.wholeHour) 8 else 4) * tickScale, paint)
+            val tickLength = when { tick.wholeHour -> 4f; tick.minute == 30 -> 2.8f; else -> 1.6f } * tickScale
+            canvas.drawLine(x, axis - tickLength, x, axis + tickLength * 2, paint)
+            audit?.ticks?.add(ChartAudit.Tick(tick.minute, tickLength * 3))
         }
         // The rendered window starts here, even between clock-aligned ticks.
         canvas.drawCircle(left, axis, 2.6f * dp, paint)
@@ -197,13 +204,13 @@ object ChartRenderer {
         paint.typeface = medium; paint.textSize = textSize; paint.textAlign = Paint.Align.RIGHT
         for (i in levelTexts.indices) {
             text(levelTexts[i], labelRight, levelBaselines[i], secondary)
-            val at = if (i == 0) maximumY else minimumY
+            val at = actualYs[i]
             paint.color = secondary; paint.strokeWidth = .45f * dp
             if (abs(at - levelYs[i]) > dp) canvas.drawLine(labelRight + dp, levelYs[i], markLeft, at, paint)
-            audit?.labels?.add(ChartAudit.Label(if (i == 0) "maximum" else "minimum", levelTexts[i], RectF(levelRects[i])))
+            audit?.labels?.add(ChartAudit.Label(if (levelIndices[i] == 0) "maximum" else "minimum", levelTexts[i], RectF(levelRects[i])))
         }
         paint.typeface = normal; paint.textSize = nowSize; paint.textAlign = Paint.Align.LEFT
-        text(now, footerLeft, nowBaseline, secondary)
+        text(now, nowLeft, nowBaseline, secondary)
         audit?.labels?.add(ChartAudit.Label("asof", now, RectF(nowRect)))
     }
     fun cm(metres: Double) = String.format(java.util.Locale.getDefault(), "%+d cm", (metres * 100).roundToInt())

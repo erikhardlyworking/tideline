@@ -1,6 +1,9 @@
 <resources>
     <item name="accuracy_note" type="id" />
-    <item name="location_shortcut" type="id" />
+    <item name="widget_selector" type="id" />
+    <item name="widget_preview" type="id" />
+    <item name="detail_chart" type="id" />
+    <item name="model_distance" type="id" />
     <item name="location_mode_current" type="id" />
     <item name="location_mode_fixed" type="id" />
     <item name="fixed_latitude" type="id" />

@@ -15,9 +15,7 @@ import android.util.TypedValue
 import android.view.*
 import android.widget.*
 import app.tideline.core.TideEvent
-import java.time.Instant
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.util.concurrent.Executors
 import kotlin.math.*
 
@@ -35,6 +33,7 @@ class MainActivity : Activity() {
     private lateinit var source: TextView
     private lateinit var locationStatus: TextView
     private var widgetId = 0
+    private var launchedFromApp = false
     private var configuring = false
     private var stopped = false
     private var locating = false
@@ -55,6 +54,7 @@ class MainActivity : Activity() {
         super.onCreate(state)
         widgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 0).coerceAtLeast(0)
         if (!intent.hasExtra(AppWidgetManager.EXTRA_APPWIDGET_ID)) widgetId = WidgetUpdates.ids(this).firstOrNull() ?: 0
+        launchedFromApp = intent.action == Intent.ACTION_MAIN || !intent.hasExtra(AppWidgetManager.EXTRA_APPWIDGET_ID) && intent.action != AppWidgetManager.ACTION_APPWIDGET_CONFIGURE
         configuring = intent.action == AppWidgetManager.ACTION_APPWIDGET_CONFIGURE && widgetId > 0
         if (configuring) setResult(RESULT_CANCELED)
         store = SettingsStore(this); settings = store.get(widgetId); access = LocationAccess(this)
@@ -119,16 +119,12 @@ class MainActivity : Activity() {
         root.addView(text(getString(R.string.app_name), 34f, ink, true))
         root.addView(text(getString(R.string.tagline), 15f, muted))
         root.addView(text(getString(R.string.accuracy_note), 13f, muted).apply { id = R.id.accuracy_note })
-        lateinit var locationPanel: LinearLayout
-        root.addView(button(getString(R.string.set_location)) {
-            scroll.smoothScrollTo(0, (locationPanel.top - dp(8)).coerceAtLeast(0))
-        }.apply { id = R.id.location_shortcut })
         val ids = WidgetUpdates.ids(this)
-        if (ids.isNotEmpty()) {
+        if (launchedFromApp && ids.isNotEmpty()) {
             // Keep a newly allocated/configuring widget selected even before
             // the launcher reports it in the provider's active widget list.
             val choices = (listOf(0) + ids.toList() + widgetId).distinct().toIntArray()
-            val spinner = Spinner(this)
+            val spinner = Spinner(this).apply { id = R.id.widget_selector }
             spinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, choices.map { if (it == 0) getString(R.string.new_widget) else getString(R.string.widget_number, it) })
             spinner.setSelection(choices.indexOf(widgetId).coerceAtLeast(0))
             spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
@@ -139,12 +135,14 @@ class MainActivity : Activity() {
             }
             root.addView(spinner)
         }
-        root.addView(text(getString(R.string.settings_for, if (widgetId == 0) getString(R.string.new_widget) else getString(R.string.widget_number, widgetId)), 12f, muted))
+        if (launchedFromApp) root.addView(text(getString(R.string.settings_for, if (widgetId == 0) getString(R.string.new_widget) else getString(R.string.widget_number, widgetId)), 12f, muted))
 
-        preview = ImageView(this).apply { scaleType = ImageView.ScaleType.FIT_XY; contentDescription = getString(R.string.widget_description) }
-        root.addView(preview, LinearLayout.LayoutParams(-1, dp(142)).apply { topMargin = dp(12); bottomMargin = dp(18) })
-        preview.addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
-            if (right - left != oldRight - oldLeft || bottom - top != oldBottom - oldTop) drawCharts()
+        if (launchedFromApp) {
+            preview = ImageView(this).apply { id = R.id.widget_preview; scaleType = ImageView.ScaleType.FIT_XY; contentDescription = getString(R.string.widget_description) }
+            root.addView(preview, LinearLayout.LayoutParams(-1, dp(142)).apply { topMargin = dp(12); bottomMargin = dp(18) })
+            preview.addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
+                if (right - left != oldRight - oldLeft || bottom - top != oldBottom - oldTop) drawCharts()
+            }
         }
         val detail = card(getString(R.string.forecast_details))
         current = text("—", 34f, ink, true); direction = text(getString(R.string.calculating), 14f, muted)
@@ -152,14 +150,16 @@ class MainActivity : Activity() {
         high = text(getString(R.string.high_tide), 15f); low = text(getString(R.string.low_tide), 15f)
         detail.addView(high); detail.addView(low)
         detail.addView(text(getString(R.string.hourly_detail), 13f, muted))
-        detailChart = ImageView(this).apply { scaleType = ImageView.ScaleType.FIT_XY; contentDescription = getString(R.string.hourly_detail) }
+        detailChart = ImageView(this).apply { id = R.id.detail_chart; scaleType = ImageView.ScaleType.FIT_XY; contentDescription = getString(R.string.hourly_detail) }
         detail.addView(detailChart, LinearLayout.LayoutParams(-1, dp(190)))
-        source = text("", 12f, muted); detail.addView(source)
+        detailChart.addOnLayoutChangeListener { _, left, _, right, _, oldLeft, _, oldRight, _ ->
+            if (right - left != oldRight - oldLeft) drawCharts()
+        }
+        source = text("", 12f, muted).apply { id = R.id.model_distance }; detail.addView(source)
         detail.addView(text(getString(R.string.astronomical_note), 13f, muted))
         detail.addView(text(getString(R.string.datum_note), 12f, muted))
 
         val location = card(getString(R.string.location))
-        locationPanel = location
         val modes = RadioGroup(this)
         val follow = RadioButton(this).apply { id = R.id.location_mode_current; text = getString(R.string.use_current_location); minHeight = dp(48) }
         val specific = RadioButton(this).apply { id = R.id.location_mode_fixed; text = getString(R.string.specific_location); minHeight = dp(48) }
@@ -181,7 +181,7 @@ class MainActivity : Activity() {
         row(fixed, field(R.string.latitude, latitude), field(R.string.longitude, longitude))
         val name = EditText(this).apply { id = R.id.fixed_location_name; hint = getString(R.string.place_name); setText(settings.place); setSingleLine(true); inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS }
         fixed.addView(name)
-        fixed.addView(button(getString(R.string.save_location)) {
+        fixed.addView(button(getString(R.string.set_location)) {
             val lat = latitude.text.toString().trim().replace(',', '.').toDoubleOrNull()
             val lon = longitude.text.toString().trim().replace(',', '.').toDoubleOrNull()
             if (lat == null || lon == null || !lat.isFinite() || !lon.isFinite() || lat !in -90.0..90.0 || lon !in -180.0..180.0) {
@@ -263,7 +263,6 @@ class MainActivity : Activity() {
                 })
             })
         }
-        slider(R.string.corner_radius, 32, settings.radius) { settings.radius = it }
         slider(R.string.padding, 32, settings.padding) { settings.padding = it }
         slider(R.string.vertical_padding, 32, settings.verticalPadding) { settings.verticalPadding = it }
         slider(R.string.line_width, 30, (settings.lineWidth * 10).roundToInt() - 7) { settings.lineWidth = (it + 7) / 10f }
@@ -312,31 +311,30 @@ class MainActivity : Activity() {
         }
     }
     private fun drawCharts() {
-        if (!::preview.isInitialized) return
         val value = snapshot ?: TideSnapshot(System.currentTimeMillis(), settings.label(), error = getString(R.string.calculating), needsLocation = settings.point() == null)
-        preview.setBackgroundColor(if (Color.alpha(settings.background) < 100) Color.rgb(38, 53, 71) else Color.TRANSPARENT)
-        val width = if (preview.width > 0) (preview.width / resources.displayMetrics.density).roundToInt() else 320
-        preview.setImageBitmap(ChartRenderer.bitmap(this, width.coerceAtLeast(110), 142, settings, value))
-        preview.contentDescription = TideWidgetProvider.description(this, settings, value)
+        if (launchedFromApp && ::preview.isInitialized) preview.setBackgroundColor(if (Color.alpha(settings.background) < 100) Color.rgb(38, 53, 71) else Color.TRANSPARENT)
+        val width = ((if (launchedFromApp && ::preview.isInitialized && preview.width > 0) preview.width else (root.width - dp(44)).coerceAtLeast(dp(110))) / resources.displayMetrics.density).roundToInt()
+        if (launchedFromApp && ::preview.isInitialized) preview.setImageBitmap(ChartRenderer.bitmap(this, width.coerceAtLeast(110), 142, settings, value))
+        if (launchedFromApp && ::preview.isInitialized) preview.contentDescription = TideWidgetProvider.description(this, settings, value)
         if (!::detailChart.isInitialized) return
         val detailStyle = settings.copy(background = 0, foreground = ink, curve = Color.rgb(18, 107, 131), padding = 6, verticalPadding = 0)
         detailChart.setImageBitmap(ChartRenderer.bitmap(this, (width - 36).coerceAtLeast(110), 190, detailStyle, value, 24))
         if (value.signal == null) {
             current.text = "—"; direction.text = value.error ?: getString(R.string.unavailable)
-            high.text = ""; low.text = ""; source.text = ""
+            high.text = ""; low.text = ""; source.text = value.nearestCellDistanceKm?.let { getString(R.string.model_distance, it) } ?: ""
         } else {
             current.text = ChartRenderer.cm(value.currentMetres)
             direction.text = getString(when { value.slope > .01 -> R.string.rising; value.slope < -.01 -> R.string.falling; else -> R.string.turning })
             high.text = "${getString(R.string.high_tide)}  ${event(value.nextHigh)}"
             low.text = "${getString(R.string.low_tide)}  ${event(value.nextLow)}"
             val location = value.modelLocation!!
-            source.text = getString(R.string.model_support, location.method, location.distanceKm) + "\n" +
+            source.text = getString(R.string.model_distance, location.nearestCellDistanceKm) + "\n" + location.method + "\n" +
                 String.format(java.util.Locale.getDefault(), "%.3f°, %.3f° · %s", location.represented.latitude, location.represented.longitude, ZoneId.systemDefault().id)
         }
         updateLocationStatus()
     }
     private fun event(value: TideEvent?): String = value?.let {
-        DateTimeFormatter.ofPattern("EEE HH:mm z").format(Instant.ofEpochMilli(it.epochMillis).atZone(ZoneId.systemDefault())) + "  ·  " + ChartRenderer.cm(it.metres)
+        PhoneFormats.dateTime(this, it.epochMillis) + "  ·  " + ChartRenderer.cm(it.metres)
     } ?: getString(R.string.no_extremum)
     private fun updateLocationStatus() {
         if (!::locationStatus.isInitialized) return
@@ -344,7 +342,7 @@ class MainActivity : Activity() {
         if (settings.followCurrent && !access.permitted() && store.locationPermissionAsked) { locationStatus.text = getString(R.string.no_location_permission); return }
         locationStatus.text = if (settings.followCurrent) {
             val details = if (settings.locationAt > 0) {
-                getString(R.string.location_age, DateTimeFormatter.ofPattern("d MMM HH:mm").format(Instant.ofEpochMilli(settings.locationAt).atZone(ZoneId.systemDefault())), settings.accuracy.roundToInt()) + "\n"
+                getString(R.string.location_age, PhoneFormats.dateTime(this, settings.locationAt), settings.accuracy.roundToInt()) + "\n"
             } else ""
             details + getString(if (settings.backgroundFollow && BackgroundLocation.permitted(this)) R.string.location_following else R.string.location_stored)
         } else settings.label()

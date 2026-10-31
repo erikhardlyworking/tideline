@@ -59,7 +59,6 @@ class WidgetInstrumentation : Instrumentation() {
             check(store.get(99991).hours == 4 && store.get(99992).hours == 24)
             check(WidgetSettings.fromJson(null).hours == 4 && WidgetSettings.fromJson("{\"hours\":2}").hours == 2)
             check(!settings.backgroundFollow)
-            check(settings.radius == 0)
             val defaultsContext = object : android.content.ContextWrapper(context) {
                 override fun getApplicationContext(): android.content.Context = this
                 override fun getSharedPreferences(name: String, mode: Int): android.content.SharedPreferences =
@@ -72,8 +71,7 @@ class WidgetInstrumentation : Instrumentation() {
             upgraded.put(0, WidgetSettings(hours = 6))
             check(SettingsStore(defaultsContext).get(0).hours == 6) { "Default migration repeated over a later choice" }
             oldDefaults.edit().clear().commit()
-            check(WidgetSettings.fromJson(settings.copy(radius = 16, lineWidth = 1.6f).toJson()).radius == 16)
-            check(WidgetSettings.fromJson(settings.copy(radius = 16, lineWidth = 1.6f).toJson()).lineWidth == 1.6f)
+            check(WidgetSettings.fromJson(settings.copy(lineWidth = 1.6f).toJson()).lineWidth == 1.6f)
             val old = settings.copy(followCurrent = true, backgroundFollow = true)
             store.put(99992, old)
             val fix = android.location.Location("network").apply { latitude = 59.0; longitude = 8.0; time = System.currentTimeMillis(); accuracy = 2500f }
@@ -94,7 +92,7 @@ class WidgetInstrumentation : Instrumentation() {
             check(snapshot.signal != null) { "Real-data prediction failed: ${snapshot.error}" }
             check(snapshot.nextHigh != null && snapshot.nextLow != null)
             check(snapshot.maximum24 > snapshot.minimum24)
-            check(snapshot.modelLocation!!.distanceKm <= 20)
+            check(snapshot.modelLocation!!.distanceKm <= 30)
             val inland = TideRepository.snapshot(context, settings.copy(latitude = 52.52, longitude = 13.405), now)
             check(inland.signal == null && inland.coverageProblem == app.tideline.core.LocationProblem.TOO_FAR_FROM_COAST)
             val outputDirectory = File(context.filesDir, "device-checks").apply { mkdirs() }
@@ -105,7 +103,16 @@ class WidgetInstrumentation : Instrumentation() {
                 val audit = ChartAudit()
                 val bitmap = ChartRenderer.bitmap(context, width, height, style, tide, audit = audit)
                 val update = audit.labels.filter { it.kind == "asof" }
-                check(update.size == 1 && update[0].text.startsWith(java.time.format.DateTimeFormatter.ofPattern("HH:mm").withZone(java.time.ZoneId.systemDefault()).format(java.time.Instant.ofEpochMilli(tide.startMillis)))) { "Update timestamp missing at ${width}x$height, scale ${style.labelScale}" }
+                check(update.size == 1 && update[0].text.startsWith(PhoneFormats.time(context, tide.startMillis))) { "Update timestamp missing at ${width}x$height, scale ${style.labelScale}" }
+                check(kotlin.math.abs(update[0].bounds.centerX() - bitmap.width / 2f) < .2f) { "Timestamp is not centred" }
+                val visible = tide.samples(style.hours, (width * 2).coerceIn(100, 1000))!!
+                check(audit.labels.any { it.kind == "minimum" } == visible.any { it < 0 })
+                check(audit.labels.any { it.kind == "maximum" } == (visible.any { it > 0 } || visible.all { it == 0.0 }))
+                val quarter = audit.ticks.filter { it.minute == 15 || it.minute == 45 }
+                val half = audit.ticks.filter { it.minute == 30 }
+                val whole = audit.ticks.filter { it.minute == 0 }
+                if (quarter.isNotEmpty() && half.isNotEmpty()) check(quarter.maxOf { it.length } < half.minOf { it.length })
+                if (half.isNotEmpty() && whole.isNotEmpty()) check(half.maxOf { it.length } < whole.minOf { it.length })
                 for (i in audit.labels.indices) for (j in 0 until i) {
                     check(!android.graphics.RectF.intersects(audit.labels[i].bounds, audit.labels[j].bounds)) {
                         "Overlapping ${audit.labels[i]} and ${audit.labels[j]} at ${width}x$height, scale ${style.labelScale}"
@@ -146,12 +153,26 @@ class WidgetInstrumentation : Instrumentation() {
                     }
                 }
             }
+            for (hours in listOf(2, 3, 6, 12, 24))
+                checkedRender(settings.copy(hours = hours), 320, 142, snapshot)
+            val dayWindows = (0..23).map { TideRepository.snapshot(context, settings, now + it * 3_600_000L) }
+            for ((name, predicate) in listOf<Pair<String, (Double) -> Boolean>>("above" to { it > 0 }, "below" to { it < 0 })) {
+                val oneSided = dayWindows.first { it.samples(2, 640)!!.all(predicate) }
+                val image = checkedRender(settings.copy(hours = 2), 320, 142, oneSided)
+                FileOutputStream(File(outputDirectory, "$name.png")).use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            }
+            val offset = TideRepository.snapshot(context, settings.copy(latitude = 58.15, longitude = 7.55), now)
+            check(offset.signal != null && offset.nearestCellDistanceKm!! in 0.0..30.0) { "30 km location policy failed: ${offset.error}, ${offset.nearestCellDistanceKm}" }
+            check(inland.nearestCellDistanceKm!! > 30.0 && inland.error == "Too far from coast")
+            check(PhoneFormats.time(context, now) == android.text.format.DateFormat.getTimeFormat(context).format(java.util.Date(now)))
+            check(PhoneFormats.dateTime(context, now).startsWith(android.text.format.DateFormat.getDateFormat(context).format(java.util.Date(now))))
             File(outputDirectory, "layout-audit.txt").writeText(auditLog.toString())
             val unavailable = TideSnapshot(now, "Missing coverage", error = "No supported cell")
             val noData = ChartRenderer.bitmap(context, 320, 142, settings, unavailable)
             FileOutputStream(File(outputDirectory, "unavailable.png")).use { noData.compress(Bitmap.CompressFormat.PNG, 100, it) }
             val activityIntent = Intent(context, MainActivity::class.java).putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 99991).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             activity = startActivitySync(activityIntent)
+            onUi { activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
             waitForIdleSync()
             // The engine is synchronous in the device checks; the UI uses a
             // background executor. Allow it to publish its real chart.
@@ -174,12 +195,12 @@ class WidgetInstrumentation : Instrumentation() {
                 fun buttons(node: View): List<Button> = (if (node is Button) listOf(node) else emptyList()) +
                     (if (node is ViewGroup) (0 until node.childCount).flatMap { buttons(node.getChildAt(it)) } else emptyList())
                 val controls = buttons(view).filterNot { it is CompoundButton }.filter { it.isShown }
-                check(controls.size >= 10)
+                check(controls.size >= 9)
                 for (button in controls) {
                     check(button.maxLines == 1 && button.layout.lineCount == 1) { "Button wraps: ${button.text}" }
                     check(button.layout.getEllipsisCount(0) == 0) { "Button text does not fit: ${button.text}" }
                 }
-                check(labels.any { it.contains("km from requested location") })
+                check(labels.any { it.contains("Distance to nearest tide cell:") })
                 check(labels.any { it.contains("°") && it.contains(" · ") }) { "Represented model coordinates missing from details" }
                 File(outputDirectory, "detail-text.txt").writeText(labels.joinToString("\n---\n"))
                 val image = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
@@ -187,7 +208,12 @@ class WidgetInstrumentation : Instrumentation() {
                 FileOutputStream(File(outputDirectory, "detail-screen.png")).use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
             }
             onUi {
-                activity.findViewById<Button>(R.id.location_shortcut).performClick()
+                check(activity.findViewById<View>(R.id.widget_selector) == null)
+                check(activity.findViewById<View>(R.id.widget_preview) == null)
+                val content = activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0) as android.widget.ScrollView
+                val field = activity.findViewById<View>(R.id.fixed_latitude)
+                val rectangle = android.graphics.Rect(); field.getDrawingRect(rectangle)
+                content.offsetDescendantRectToMyCoords(field, rectangle); content.scrollTo(0, rectangle.top)
                 activity.findViewById<android.widget.RadioButton>(R.id.location_mode_fixed).isChecked = true
                 activity.findViewById<android.widget.EditText>(R.id.fixed_latitude).setText("58.006377")
                 activity.findViewById<android.widget.EditText>(R.id.fixed_longitude).setText("7.554759")
@@ -203,13 +229,26 @@ class WidgetInstrumentation : Instrumentation() {
             val tapped = waitForMonitorWithTimeout(tapMonitor, 5000)
             check(tapped != null && tapped.intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 0) == 99991) { "Widget tap did not open its own detail screen" }
             onUi { tapped.finish() }; removeMonitor(tapMonitor)
-            output.putString("result", "Real offline EOT20 predictions, inland detection, opt-in location fix filtering and edit races, 4-hour defaults, persisted appearance, 50 audited real-data renders with non-overlapping timestamps and height labels, unobstructed level guides, fixed-location saving, accuracy note, single-line buttons, RemoteViews and widget tap passed")
+            for (mode in listOf("configure", "launcher")) {
+                val intent = Intent(context, MainActivity::class.java).putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 99991).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                intent.action = if (mode == "launcher") Intent.ACTION_MAIN else AppWidgetManager.ACTION_APPWIDGET_CONFIGURE
+                val modeActivity = startActivitySync(intent); waitForIdleSync()
+                onUi {
+                    check((modeActivity.findViewById<View>(R.id.widget_preview) != null) == (mode == "launcher"))
+                    val expectedSelector = mode == "launcher" && WidgetUpdates.ids(context).isNotEmpty()
+                    check((modeActivity.findViewById<View>(R.id.widget_selector) != null) == expectedSelector)
+                    modeActivity.finish()
+                }
+                waitForIdleSync()
+            }
+            output.putString("result", "30 km coverage and displayed distances, centred timestamps, one-sided heights, quarter/half/hour ticks, phone time/date formats, widget/configure/launcher modes; real offline EOT20 predictions, inland detection, opt-in location fix filtering and edit races, 4-hour defaults, persisted appearance, 57 audited real-data renders with non-overlapping timestamps and height labels, unobstructed level guides, fixed-location saving, accuracy note, single-line buttons, RemoteViews and widget tap passed")
         } catch (error: Throwable) {
             output.putString("failure", error.stackTraceToString())
             outcome = Activity.RESULT_CANCELED
         } finally {
             activity?.let { onUi { it.finish() } }
-            store.delete(99991); store.delete(99992)
+            waitForIdleSync()
+            check(targetContext.getSharedPreferences("tideline", 0).edit().remove("widget/99991").remove("widget/99992").commit())
         }
         finish(outcome, output)
     }

@@ -72,7 +72,7 @@ class WaterAtlas(private val pack: ModelPack) {
         val minRow = floor((min(from.latitude, to.latitude) + 90) / 5).toInt().coerceIn(0, 35)
         val maxRow = floor((max(from.latitude, to.latitude) + 90) / 5).toInt().coerceIn(0, 35)
         val c0 = floor((from.longitude + 180) / 5).toInt()
-        // The line is at most 20 km. Adjacent tiles suffice except extremely
+        // The line is at most 30 km. Adjacent tiles suffice except extremely
         // near a pole, where longitude spans more tiles and we include them.
         val reach = ceil(abs(dx) / 5).toInt() + 1
         for (r in minRow..maxRow) for (c in c0 - reach..c0 + reach) {

@@ -16,7 +16,6 @@ data class WidgetSettings(
     var background: Int = 0xff202833.toInt(),
     var foreground: Int = -1,
     var curve: Int = -1,
-    var radius: Int = 0,
     var padding: Int = 12,
     var verticalPadding: Int = 0,
     var lineWidth: Float = 2.0f,
@@ -27,9 +26,9 @@ data class WidgetSettings(
     fun label(): String = place.ifBlank { point()?.let { String.format(java.util.Locale.getDefault(), "%.3f°, %.3f°", it.latitude, it.longitude) } ?: "" }
     fun theme(index: Int) {
         when (index) {
-            1 -> { background = 0xff202833.toInt(); foreground = -1; curve = -1; radius = 0; padding = 12; lineWidth = 2.0f }
-            2 -> { background = 0; foreground = -1; curve = -1; radius = 0; padding = 8; lineWidth = 1.35f }
-            else -> { background = 0xfff5f7fa.toInt(); foreground = 0xff263547.toInt(); curve = foreground; radius = 0; padding = 12; lineWidth = 2.0f }
+            1 -> { background = 0xff202833.toInt(); foreground = -1; curve = -1; padding = 12; lineWidth = 2.0f }
+            2 -> { background = 0; foreground = -1; curve = -1; padding = 8; lineWidth = 1.35f }
+            else -> { background = 0xfff5f7fa.toInt(); foreground = 0xff263547.toInt(); curve = foreground; padding = 12; lineWidth = 2.0f }
         }
         verticalPadding = 0
     }
@@ -38,7 +37,7 @@ data class WidgetSettings(
         put("place", place); put("locationAt", locationAt); put("accuracy", accuracy); put("hours", hours)
         put("appearanceVersion", 2)
         put("background", background); put("foreground", foreground); put("curve", curve)
-        put("radius", radius); put("padding", padding); put("verticalPadding", verticalPadding); put("lineWidth", lineWidth); put("labelScale", labelScale); put("guides", guides)
+        put("padding", padding); put("verticalPadding", verticalPadding); put("lineWidth", lineWidth); put("labelScale", labelScale); put("guides", guides)
     }.toString()
     companion object {
         val DURATIONS = intArrayOf(2, 3, 4, 6, 12, 24)
@@ -57,11 +56,10 @@ data class WidgetSettings(
                     if (s.curve == 0xff82c8ff.toInt()) s.curve = -1
                     if (s.foreground == 0xffe3eaf2.toInt()) s.foreground = -1
                 } else if (s.background == 0xfff5f7fa.toInt() && s.curve == 0xff1565c0.toInt()) s.curve = s.foreground
-                s.radius = o.optInt("radius", 0).coerceIn(0, 32); s.padding = o.optInt("padding", 12).coerceIn(0, 32)
+                s.padding = o.optInt("padding", 12).coerceIn(0, 32)
                 s.verticalPadding = o.optInt("verticalPadding", 0).coerceIn(0, 32)
                 s.lineWidth = o.optDouble("lineWidth", 2.0).toFloat().takeIf { it.isFinite() }?.coerceIn(.7f, 4f) ?: 2.0f
                 if (o.optInt("appearanceVersion", 0) < 2) {
-                    if (s.radius == 16) s.radius = 0
                     if (s.lineWidth == 1.6f) s.lineWidth = 2.0f
                     if (s.lineWidth == 1.05f) s.lineWidth = 1.35f
                 }

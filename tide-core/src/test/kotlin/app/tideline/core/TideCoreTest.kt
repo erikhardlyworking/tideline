@@ -87,6 +87,25 @@ class TideCoreTest {
             assertThrows(Exception::class.java) { pack.cell(check.int("row"), check.int("col")) }
         }
     }
+    @Test fun nearestCellBoundsMatchAnExhaustiveSearchIncludingPolesAndDateline() {
+        ModelPack(MemorySource(resource("cell_fixture.tpk"))).use { pack ->
+            val wet = pack.header.getValue("entries").jsonArray.flatMap { item ->
+                val entry = item.jsonObject; val parts = entry.string("key").split('/')
+                if (parts[0] != "tide") emptyList() else {
+                    val r = parts[1].toInt(); val c = parts[2].toInt()
+                    (r until r + entry.int("rows")).flatMap { row ->
+                        (c until c + entry.int("cols")).filter { pack.cell(row, it) != null }.map { col -> row to col }
+                    }
+                }
+            }
+            for (point in listOf(GeoPoint(52.52, 13.405), GeoPoint(-75.0, 179.99), GeoPoint(-75.0, -179.99), GeoPoint(90.0, 0.0), GeoPoint(-90.0, 0.0))) {
+                val expected = wet.minOf { (r, c) -> point.distanceKm(pack.point(r, c)) }
+                val actual = pack.nearestCell(point)!!
+                assertEquals(expected, actual.distanceKm, 1e-8)
+                assertNotNull(pack.cell(actual.row, actual.col))
+            }
+        }
+    }
     @Test fun datelineDistanceAndComplexPhaseWrap() {
         assertEquals(0.0, GeoPoint(0.0, 180.0).distanceKm(GeoPoint(0.0, -180.0)), 1e-8)
         assertEquals(111.195, GeoPoint(0.0, 0.0).distanceKm(GeoPoint(0.0, 1.0)), .001)

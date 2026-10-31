@@ -79,6 +79,41 @@ class ModelPack(private val source: DataSource) : Closeable {
 
     fun hasBlock(key: String) = entries.containsKey(key)
 
+    private val wetPositions = mutableMapOf<String, IntArray>()
+
+    /** Exact nearest stored wet cell; conservative tile bounds also work at the dateline/poles. */
+    @Synchronized fun nearestCell(point: GeoPoint): SupportCell? {
+        data class Tile(val key: String, val row: Int, val col: Int, val columns: Int, val lowerBound: Double)
+        val tiles = entries.filterKeys { it.startsWith("tide/") }.map { (key, meta) ->
+            val parts = key.split('/'); val row = parts[1].toInt(); val col = parts[2].toInt()
+            val latSpan = (meta.int("rows") - 1) * step
+            val lonSpan = (meta.int("cols") - 1) * step
+            val centre = GeoPoint(latitude0 + row * step + latSpan / 2,
+                ((longitude0 + col * step + lonSpan / 2 + 180) % 360) - 180)
+            // A meridian plus a parallel bounds the distance to every point in the tile.
+            val radius = Math.toRadians((latSpan + lonSpan) / 2) * 6371.0088
+            Tile(key, row, col, meta.int("cols"), max(0.0, point.distanceKm(centre) - radius))
+        }.sortedBy { it.lowerBound }
+        var best: SupportCell? = null
+        for (tile in tiles) {
+            if (tile.lowerBound > (best?.distanceKm ?: Double.POSITIVE_INFINITY) + 1e-9) break
+            val positions = wetPositions.getOrPut(tile.key) {
+                val meta = entries.getValue(tile.key); val raw = block(tile.key)
+                (0 until meta.int("rows") * tile.columns)
+                    .filter { (raw[it / 8].toInt() ushr (it % 8)) and 1 != 0 }.toIntArray()
+            }
+            for (index in positions) {
+                val row = tile.row + index / tile.columns; val col = tile.col + index % tile.columns
+                val candidate = point(row, col); val distance = point.distanceKm(candidate)
+                val previous = best
+                if (previous == null || distance < previous.distanceKm ||
+                    (distance == previous.distanceKm && (row < previous.row || row == previous.row && col < previous.col)))
+                    best = SupportCell(row, col, candidate, distance, 1.0)
+            }
+        }
+        return best
+    }
+
     @Synchronized fun block(key: String): ByteArray {
         val entry = entries[key] ?: throw IllegalArgumentException("Missing data tile: $key")
         val length = entry.int("length"); val expected = entry.int("raw_length")
