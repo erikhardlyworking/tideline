@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.Instrumentation
 import android.appwidget.AppWidgetManager
 import android.content.Intent
+import android.content.ComponentName
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -27,6 +28,8 @@ class WidgetInstrumentation : Instrumentation() {
         runOnMainSync { try { action() } catch (failure: Throwable) { error = failure } }
         error?.let { throw it }
     }
+    private fun buttons(node: View): List<Button> = (if (node is Button) listOf(node) else emptyList()) +
+        (if (node is ViewGroup) (0 until node.childCount).flatMap { buttons(node.getChildAt(it)) } else emptyList())
     override fun onCreate(arguments: Bundle?) {
         exportStoreAssets = arguments?.getString("storeAssets") == "true"
         super.onCreate(arguments); start()
@@ -53,6 +56,12 @@ class WidgetInstrumentation : Instrumentation() {
             @Suppress("DEPRECATION") val permissions = context.packageManager.getPackageInfo(context.packageName, PackageManager.GET_PERMISSIONS).requestedPermissions ?: emptyArray()
             check("android.permission.INTERNET" !in permissions) { "Offline app unexpectedly requests Internet access" }
             check("android.permission.ACCESS_FINE_LOCATION" !in permissions) { "App should only request approximate location" }
+            val provider = AppWidgetManager.getInstance(context).installedProviders.first {
+                it.provider == ComponentName(context, TideWidgetProvider::class.java)
+            }
+            if (android.os.Build.VERSION.SDK_INT >= 31) check(provider.targetCellWidth == 2 && provider.targetCellHeight == 2) { "New widgets must default to 2×2" }
+            val legacyDefault = (110 * context.resources.displayMetrics.density).toInt()
+            check(provider.minWidth >= legacyDefault && provider.minHeight >= legacyDefault) { "Older launchers need a two-cell default in both directions" }
             val settings = WidgetSettings(followCurrent = false, latitude = 58.006377, longitude = 7.554759, place = "Tregde")
             store.put(99991, settings)
             store.put(99992, settings.copy(hours = 24, place = "Independent widget"))
@@ -127,7 +136,7 @@ class WidgetInstrumentation : Instrumentation() {
             }
             for (theme in 0..2) {
                 val style = settings.copy().apply { theme(theme) }
-                for ((index, size) in listOf(130 to 64, 320 to 142, 400 to 100, 180 to 240).withIndex()) {
+                for ((index, size) in listOf(130 to 64, 320 to 142, 400 to 100, 180 to 240, 180 to 180).withIndex()) {
                     val bitmap = checkedRender(style, size.first, size.second, snapshot)
                     check(bitmap.width > 0 && bitmap.height > 0 && bitmap.allocationByteCount <= 3_000_000)
                     if (theme == 2) check(Color.alpha(bitmap.getPixel(0, 0)) == 0)
@@ -192,8 +201,6 @@ class WidgetInstrumentation : Instrumentation() {
                     (if (node is ViewGroup) (0 until node.childCount).flatMap { texts(node.getChildAt(it)) } else emptyList())
                 val labels = texts(view)
                 check(activity.findViewById<TextView>(R.id.accuracy_note).text.contains("5.3%"))
-                fun buttons(node: View): List<Button> = (if (node is Button) listOf(node) else emptyList()) +
-                    (if (node is ViewGroup) (0 until node.childCount).flatMap { buttons(node.getChildAt(it)) } else emptyList())
                 val controls = buttons(view).filterNot { it is CompoundButton }.filter { it.isShown }
                 check(controls.size >= 9)
                 for (button in controls) {
@@ -224,11 +231,25 @@ class WidgetInstrumentation : Instrumentation() {
             check(kotlin.math.abs(store.get(99991).latitude - 58.006377) < 1e-9)
             check(kotlin.math.abs(store.get(99991).longitude - 7.554759) < 1e-9)
             val tapMonitor = addMonitor(MainActivity::class.java.name, null, false)
+            val idsBeforeEditing = WidgetUpdates.ids(context).sorted()
+            val otherWidgetBeforeEditing = store.get(99992).toJson()
             val tappable = TideWidgetProvider.views(context, 99991, 320, 142, settings, snapshot)
             onUi { check(tappable.apply(context, null).findViewById<ImageView>(R.id.chart).performClick()) }
             val tapped = waitForMonitorWithTimeout(tapMonitor, 5000)
             check(tapped != null && tapped.intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 0) == 99991) { "Widget tap did not open its own detail screen" }
-            onUi { tapped.finish() }; removeMonitor(tapMonitor)
+            onUi {
+                check(tapped.findViewById<View>(R.id.widget_selector) == null && tapped.findViewById<View>(R.id.widget_preview) == null)
+                val actions = buttons(tapped.findViewById(android.R.id.content))
+                check(actions.none { it.text.toString() == context.getString(R.string.add_widget) }) { "An existing widget tap offers to add another widget" }
+                tapped.findViewById<android.widget.EditText>(R.id.fixed_location_name).setText("Saved from widget tap")
+                tapped.findViewById<Button>(R.id.save_fixed_location).performClick()
+                actions.single { it.text.toString() == context.getString(R.string.finish_setup) }.performClick()
+                check(tapped.isFinishing) { "Save widget did not finish editing" }
+            }
+            check(store.get(99991).place == "Saved from widget tap") { "The tapped widget's edits were not saved" }
+            check(store.get(99992).toJson() == otherWidgetBeforeEditing) { "Editing one widget changed another" }
+            check(WidgetUpdates.ids(context).sorted() == idsBeforeEditing) { "Editing created another widget" }
+            removeMonitor(tapMonitor)
             for (mode in listOf("configure", "launcher")) {
                 val intent = Intent(context, MainActivity::class.java).putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 99991).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 intent.action = if (mode == "launcher") Intent.ACTION_MAIN else AppWidgetManager.ACTION_APPWIDGET_CONFIGURE
@@ -237,11 +258,14 @@ class WidgetInstrumentation : Instrumentation() {
                     check((modeActivity.findViewById<View>(R.id.widget_preview) != null) == (mode == "launcher"))
                     val expectedSelector = mode == "launcher" && WidgetUpdates.ids(context).isNotEmpty()
                     check((modeActivity.findViewById<View>(R.id.widget_selector) != null) == expectedSelector)
+                    val actions = buttons(modeActivity.findViewById(android.R.id.content)).map { it.text.toString() }
+                    check((context.getString(R.string.add_widget) in actions) == (mode == "launcher"))
+                    check((context.getString(R.string.finish_setup) in actions) == (mode == "configure"))
                     modeActivity.finish()
                 }
                 waitForIdleSync()
             }
-            output.putString("result", "30 km coverage and displayed distances, centred timestamps, one-sided heights, quarter/half/hour ticks, phone time/date formats, widget/configure/launcher modes; real offline EOT20 predictions, inland detection, opt-in location fix filtering and edit races, 4-hour defaults, persisted appearance, 57 audited real-data renders with non-overlapping timestamps and height labels, unobstructed level guides, fixed-location saving, accuracy note, single-line buttons, RemoteViews and widget tap passed")
+            output.putString("result", "30 km coverage and displayed distances, centred timestamps, one-sided heights, quarter/half/hour ticks, phone time/date formats, widget/configure/launcher modes; real offline EOT20 predictions, inland detection, opt-in location fix filtering and edit races, 4-hour forecasts, 2×2 widget defaults, persisted appearance, 60 audited real-data renders with non-overlapping timestamps and height labels, unobstructed level guides, fixed-location saving, accuracy note, single-line buttons, RemoteViews and widget tap saving only its own settings without adding another widget passed")
         } catch (error: Throwable) {
             output.putString("failure", error.stackTraceToString())
             outcome = Activity.RESULT_CANCELED

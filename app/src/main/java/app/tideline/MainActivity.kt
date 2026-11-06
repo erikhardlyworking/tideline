@@ -269,8 +269,10 @@ class MainActivity : Activity() {
         slider(R.string.label_size, 150, (settings.labelScale * 100).roundToInt() - 100, { "${it + 100}%" }) { settings.labelScale = (it + 100) / 100f }
         appearance.addView(Switch(this).apply { text = getString(R.string.show_guides); isChecked = settings.guides; minHeight = dp(48); setOnCheckedChangeListener { _, checked -> settings.guides = checked; save(); drawCharts() } })
 
-        if (configuring) root.addView(button(getString(R.string.finish_setup)) {
-            save(); setResult(RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)); WidgetUpdates.schedule(this); finish()
+        if (!launchedFromApp && widgetId > 0) root.addView(button(getString(R.string.finish_setup)) {
+            save()
+            if (configuring) setResult(RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId))
+            WidgetUpdates.schedule(this); finish()
         }) else root.addView(button(getString(R.string.add_widget)) { pinWidget() })
         root.addView(button(getString(R.string.refresh)) { if (settings.followCurrent) requestLocation() else recalculate() })
         val about = card(getString(R.string.about_data))

@@ -25,8 +25,8 @@ android {
         applicationId = "app.tideline"
         minSdk = 26
         targetSdk = 36
-        versionCode = 8
-        versionName = "0.3.0"
+        versionCode = 9
+        versionName = "0.3.1"
         testInstrumentationRunner = "app.tideline.WidgetInstrumentation"
     }
     signingConfigs {
@@ -38,6 +38,9 @@ android {
         }
     }
     buildTypes {
+        getByName("debug") {
+            if (providers.gradleProperty("tidelineIsolatedTest").orNull == "true") applicationIdSuffix = ".testing"
+        }
         getByName("release") {
             if (uploadSigningConfigured) signingConfig = signingConfigs.getByName("upload")
         }

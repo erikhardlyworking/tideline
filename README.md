@@ -3,6 +3,7 @@
 An offline Android home-screen tide widget. A white tide curve runs around a central mean-sea-level time axis, with high/low marks and a timestamped height in centimetres. Tap for the next 24 hours, high/low times and settings.
 
 - Four-hour default, with 2/3/4/6/12/24-hour forecasts for each widget.
+- New widgets start at 2×2 cells and can be resized.
 - Whole-hour labels, quarter-hour ticks and larger half-hour ticks in shorter views; the centred timestamp identifies the last calculation.
 - Fixed coastal coordinates or approximate current location, with optional background following.
 - Adjustable colours, transparency, label size, line thickness and padding. Launcher-controlled corners and zero vertical padding by default.
@@ -18,7 +19,7 @@ Coverage depends on EOT20 and the mapped coastline. Small harbours and fjords ca
 
 ## Use
 
-Open TideLine and find the **Location** section below Tide details. Choose **Current location** or **Specific location**; a fixed location accepts latitude, longitude and an optional name. Add the widget through the app or the launcher's widget picker. Each widget retains its own location, forecast duration and appearance.
+Open TideLine and find the **Location** section below Tide details. Choose **Current location** or **Specific location**; a fixed location accepts latitude, longitude and an optional name. Add the widget through the app or the launcher's widget picker. Each widget retains its own location, forecast duration and appearance. Tapping a widget opens its own settings; **Save widget** applies the settings and closes the screen.
 
 The widget refreshes approximately every 15 minutes; Android can delay updates during sleep or battery saving. It is not a live clock. The centred time and height identify its last calculation. Open the app or tap **Refresh** for an immediate calculation.
 
@@ -51,6 +52,8 @@ adb install --user 0 -r app/build/outputs/apk/debug/app-debug.apk
 adb install --user 0 -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 adb shell am instrument --user 0 -w -r app.tideline.test/app.tideline.WidgetInstrumentation
 ```
+
+If the phone has a Play/release installation, build the debug and test APKs with `-PtidelineIsolatedTest=true`. They use `app.tideline.testing`, leaving the installed app's widgets and settings available. Run that copy with `adb shell am instrument --user 0 -w -r app.tideline.testing.test/app.tideline.WidgetInstrumentation`.
 
 ## Bundled data
 
