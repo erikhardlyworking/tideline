@@ -14,6 +14,15 @@ object BackgroundLocation {
     private const val ACTION = "app.tideline.APPROXIMATE_LOCATION"
     fun permitted(context: Context): Boolean = context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED &&
         (Build.VERSION.SDK_INT < 29 || context.checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED)
+    private fun providers(context: Context): List<String> {
+        val manager = context.getSystemService(LocationManager::class.java)
+        if (Build.VERSION.SDK_INT >= 28 && !manager.isLocationEnabled) return emptyList()
+        return listOf(LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER)
+            .filter { try { manager.isProviderEnabled(it) } catch (_: Exception) { false } }
+    }
+    fun supported(context: Context) = permitted(context) && providers(context).isNotEmpty()
+    fun registered(context: Context, widgetId: Int): Boolean = widgetId !in WidgetUpdates.ids(context) ||
+        context.getSharedPreferences("background-registration", Context.MODE_PRIVATE).getString("providers", "").orEmpty().isNotEmpty()
     private fun activeIds(context: Context): IntArray {
         val store = SettingsStore(context)
         return WidgetUpdates.ids(context).filter { store.get(it).let { value -> value.followCurrent && value.backgroundFollow } }.toIntArray()
@@ -28,8 +37,7 @@ object BackgroundLocation {
     fun sync(context: Context, force: Boolean = false) {
         val manager = context.getSystemService(LocationManager::class.java)
         val enabled = permitted(context) && activeIds(context).isNotEmpty()
-        val providers = listOf(LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER)
-            .filter { try { manager.isProviderEnabled(it) } catch (_: Exception) { false } }
+        val providers = providers(context)
         val signature = if (enabled) providers.joinToString(",") else ""
         val preferences = context.getSharedPreferences("background-registration", Context.MODE_PRIVATE)
         if (!force && preferences.getString("providers", null) == signature) return
@@ -82,6 +90,13 @@ object BackgroundLocation {
             WidgetUpdates.enqueue(context)
         }
     }
+}
+
+/** Device capability boundary shared by permission setup and its switch state. */
+open class BackgroundAccess(private val context: Context) {
+    open fun permitted() = BackgroundLocation.permitted(context)
+    open fun supported() = BackgroundLocation.supported(context)
+    open fun registered(widgetId: Int) = BackgroundLocation.registered(context, widgetId)
 }
 
 class BackgroundLocationReceiver : BroadcastReceiver() {

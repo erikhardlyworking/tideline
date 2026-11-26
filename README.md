@@ -28,6 +28,8 @@ The widget refreshes approximately every 15 minutes; Android can delay updates d
 
 Background following is off by default. Enabling it shows a disclosure before Android permission setup. Only approximate location is requested; Android 10+ needs separate background access for following. Updates use occasional network/passive system fixes, and only the latest fix is retained locally. Fixed locations and foreground updates work without background permission.
 
+In Android app settings → Permissions → Location, choose **Allow all the time** (the app shows the phone's actual option label). The switch stays off during setup and turns on only when permission, a location provider and any existing widget's background registration are available. Missing or revoked access turns it off; a failed attempt shows its reason in bold. Re-enable following after resolving the cause. Android can still delay delivery. **Use my location** captures a fixed point and does not enable following.
+
 Tide data is used within 30 km of a stored tide cell, with a marine-path check to avoid selecting data across islands. Beyond 30 km the widget shows **Too far from coast**. Tide details shows the calculated cell distance. Widget configuration opens directly to Tide details; the widget selector and preview appear when starting the app itself.
 
 ## Build and test
@@ -56,7 +58,7 @@ adb install --user 0 -r app/build/outputs/apk/androidTest/debug/app-debug-androi
 adb shell am instrument --user 0 -w -r app.tideline.test/app.tideline.WidgetInstrumentation
 ```
 
-If the phone has a Play/release installation, build the debug and test APKs with `-PtidelineIsolatedTest=true`. They use `app.tideline.testing`, leaving the installed app's widgets and settings available. Run that copy with `adb shell am instrument --user 0 -w -r app.tideline.testing.test/app.tideline.WidgetInstrumentation`.
+If the phone has a Play/release or Preview installation, build the debug and test APKs with `-PtidelineIsolatedTest=true -PtidelineTestSuffix=.verification`. They use `app.tideline.verification`, preserving both installed apps' widgets and settings. Run checks with `adb shell am instrument --user 0 -w -r app.tideline.verification.test/app.tideline.WidgetInstrumentation`. The `.testing` suffix remains available for a separate manual Preview build.
 
 ## Bundled data
 

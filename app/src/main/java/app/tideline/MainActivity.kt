@@ -25,6 +25,7 @@ class MainActivity : Activity() {
     private lateinit var store: SettingsStore
     private lateinit var settings: WidgetSettings
     private lateinit var access: LocationAccess
+    private lateinit var backgroundAccess: BackgroundAccess
     private lateinit var root: LinearLayout
     private lateinit var preview: ImageView
     private lateinit var detailChart: ImageView
@@ -43,12 +44,23 @@ class MainActivity : Activity() {
     private var pendingFixedLocation = false
     private var locationGeneration = 0
     private var continueBackgroundPermission = false
+    private var pendingBackgroundFollow = false
+    private var awaitingBackgroundSettings = false
+    private var updatingBackgroundToggle = false
+    private var backgroundFailure = false
+    private var observingLocationAvailability = false
+    private val locationAvailabilityChanged = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (!stopped) { BackgroundLocation.sync(this@MainActivity, force = true); updateBackgroundStatus() }
+        }
+    }
+    private lateinit var backgroundToggle: Switch
     private lateinit var backgroundStatus: TextView
     private var requestGeneration = 0
     private val executor = Executors.newSingleThreadExecutor()
     private val handler = Handler(Looper.getMainLooper())
     private val minuteTick = object : Runnable {
-        override fun run() { if (!stopped) { recalculate(); handler.postDelayed(this, 60_000) } }
+        override fun run() { if (!stopped) { updateBackgroundStatus(); recalculate(); handler.postDelayed(this, 60_000) } }
     }
     private var snapshot: TideSnapshot? = null
     private val ink = Color.rgb(29, 53, 65)
@@ -62,14 +74,23 @@ class MainActivity : Activity() {
         launchedFromApp = intent.action == Intent.ACTION_MAIN || !intent.hasExtra(AppWidgetManager.EXTRA_APPWIDGET_ID) && intent.action != AppWidgetManager.ACTION_APPWIDGET_CONFIGURE
         configuring = intent.action == AppWidgetManager.ACTION_APPWIDGET_CONFIGURE && widgetId > 0
         if (configuring) setResult(RESULT_CANCELED)
-        store = SettingsStore(this); settings = store.get(widgetId); access = LocationAccess(this)
+        store = SettingsStore(this); settings = store.get(widgetId); access = LocationAccess(this); backgroundAccess = BackgroundAccess(this)
+        pendingBackgroundFollow = state?.getBoolean("pendingBackgroundFollow") ?: false
+        awaitingBackgroundSettings = state?.getBoolean("awaitingBackgroundSettings") ?: false
+        continueBackgroundPermission = state?.getBoolean("continueBackgroundPermission") ?: false
+        backgroundFailure = state?.getBoolean("backgroundFailure") ?: false
         buildScreen()
         recalculate()
     }
     override fun onStart() {
         super.onStart(); stopped = false
+        val availability = IntentFilter(android.location.LocationManager.PROVIDERS_CHANGED_ACTION)
+        if (Build.VERSION.SDK_INT >= 33) registerReceiver(locationAvailabilityChanged, availability, RECEIVER_NOT_EXPORTED)
+        else registerReceiver(locationAvailabilityChanged, availability)
+        observingLocationAvailability = true
         settings = store.get(widgetId)
         BackgroundLocation.sync(this, force = true)
+        if (awaitingBackgroundSettings) { awaitingBackgroundSettings = false; completeBackgroundSetup() }
         updateBackgroundStatus()
         if (snapshot != null) recalculate()
         if (settings.followCurrent) {
@@ -78,8 +99,25 @@ class MainActivity : Activity() {
         }
         handler.removeCallbacks(minuteTick); handler.postDelayed(minuteTick, 60_000)
     }
-    override fun onStop() { stopped = true; cancelActiveLocation(); handler.removeCallbacks(minuteTick); super.onStop() }
+    override fun onStop() {
+        stopped = true
+        if (observingLocationAvailability) { unregisterReceiver(locationAvailabilityChanged); observingLocationAvailability = false }
+        cancelActiveLocation(); handler.removeCallbacks(minuteTick); super.onStop()
+    }
     override fun onDestroy() { executor.shutdownNow(); super.onDestroy() }
+    override fun onSaveInstanceState(out: Bundle) {
+        out.putBoolean("pendingBackgroundFollow", pendingBackgroundFollow)
+        out.putBoolean("awaitingBackgroundSettings", awaitingBackgroundSettings)
+        out.putBoolean("continueBackgroundPermission", continueBackgroundPermission)
+        out.putBoolean("backgroundFailure", backgroundFailure)
+        super.onSaveInstanceState(out)
+    }
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && ::backgroundAccess.isInitialized && ::backgroundToggle.isInitialized) {
+            BackgroundLocation.sync(this); updateBackgroundStatus()
+        }
+    }
 
     private fun text(value: String, size: Float = 15f, colour: Int = ink, bold: Boolean = false): TextView = TextView(this).apply {
         this.text = value; textSize = size; setTextColor(colour)
@@ -141,7 +179,7 @@ class MainActivity : Activity() {
             spinner.setSelection(choices.indexOf(widgetId).coerceAtLeast(0))
             spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
                 override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                    if (choices[position] != widgetId) { pendingFixedLocation = false; cancelActiveLocation(); widgetId = choices[position]; settings = store.get(widgetId); snapshot = null; buildScreen(); recalculate() }
+                    if (choices[position] != widgetId) { pendingBackgroundFollow = false; awaitingBackgroundSettings = false; continueBackgroundPermission = false; pendingFixedLocation = false; cancelActiveLocation(); widgetId = choices[position]; settings = store.get(widgetId); snapshot = null; buildScreen(); recalculate() }
                 }
                 override fun onNothingSelected(parent: AdapterView<*>?) {}
             }
@@ -242,19 +280,20 @@ class MainActivity : Activity() {
             requestLocation(fixed = true)
         }.apply { id = R.id.capture_my_location }
         location.addView(locateButton)
-        val background = Switch(this).apply { text = getString(R.string.background_follow); isChecked = settings.backgroundFollow; minHeight = dp(48); visibility = if (settings.followCurrent) View.VISIBLE else View.GONE }
-        backgroundStatus = text("", 12f, muted)
+        val background = Switch(this).apply { id = R.id.background_follow_toggle; text = getString(R.string.background_follow); minHeight = dp(48); visibility = if (settings.followCurrent) View.VISIBLE else View.GONE }
+        backgroundToggle = background
+        backgroundStatus = text("", 12f, muted).apply { id = R.id.background_follow_status }
         location.addView(background); location.addView(backgroundStatus)
         background.setOnCheckedChangeListener { _, checked ->
-            if (!checked) { settings.backgroundFollow = false; save(); updateBackgroundStatus() }
-            else if (!settings.backgroundFollow) {
-                background.isChecked = false
+            if (updatingBackgroundToggle) return@setOnCheckedChangeListener
+            if (!checked) { backgroundFailure = false; pendingBackgroundFollow = false; awaitingBackgroundSettings = false; continueBackgroundPermission = false; settings.backgroundFollow = false; save(); updateBackgroundStatus() }
+            else {
+                updatingBackgroundToggle = true; background.isChecked = false; updatingBackgroundToggle = false
                 AlertDialog.Builder(this).setTitle(R.string.background_follow)
                     .setMessage(R.string.background_disclosure)
                     .setNegativeButton(R.string.not_now, null)
                     .setPositiveButton(R.string.continue_setup) { _, _ ->
-                        settings.backgroundFollow = true; background.isChecked = true
-                        save(); requestBackgroundPermission()
+                        backgroundFailure = false; pendingBackgroundFollow = true; requestBackgroundPermission()
                     }.show()
             }
         }
@@ -269,6 +308,8 @@ class MainActivity : Activity() {
             name.visibility = if (checked) View.GONE else View.VISIBLE
             if (checked) { settings.latitude = Double.NaN; settings.longitude = Double.NaN; settings.locationAt = 0 }
             if (!checked) {
+                backgroundFailure = false
+                pendingBackgroundFollow = false; awaitingBackgroundSettings = false
                 continueBackgroundPermission = false
                 if (settings.fixedLatitude.isFinite() && settings.fixedLongitude.isFinite()) {
                     settings.latitude = settings.fixedLatitude; settings.longitude = settings.fixedLongitude
@@ -511,29 +552,66 @@ class MainActivity : Activity() {
             val fixed = pendingFixedLocation; pendingFixedLocation = false
             if (access.permitted()) requestLocation(fixed) else locationStatus.text = getString(R.string.no_location_permission)
             val followSetup = continueBackgroundPermission; continueBackgroundPermission = false
-            if (followSetup && settings.followCurrent && settings.backgroundFollow && access.permitted()) requestBackgroundPermission()
+            if (followSetup && pendingBackgroundFollow && settings.followCurrent && access.permitted()) requestBackgroundPermission()
+            else if (followSetup) { backgroundFailure = true; pendingBackgroundFollow = false; updateBackgroundStatus() }
         }
-        if (requestCode == 22) { BackgroundLocation.sync(this, force = true); updateBackgroundStatus() }
+        if (requestCode == 22) completeBackgroundSetup()
     }
     private fun updateBackgroundStatus() {
         if (!::backgroundStatus.isInitialized) return
+        val active = settings.followCurrent && settings.backgroundFollow && backgroundAccess.permitted() && backgroundAccess.supported() && backgroundAccess.registered(widgetId)
+        if (settings.backgroundFollow && !active) { backgroundFailure = settings.followCurrent; settings.backgroundFollow = false; save() }
+        if (active) backgroundFailure = false
+        updatingBackgroundToggle = true; backgroundToggle.isChecked = active; updatingBackgroundToggle = false
         backgroundStatus.visibility = if (settings.followCurrent) View.VISIBLE else View.GONE
-        backgroundStatus.text = getString(when {
-            !settings.backgroundFollow -> R.string.background_off
-            !BackgroundLocation.permitted(this) -> R.string.background_permission_missing
+        val option = when {
+            Build.VERSION.SDK_INT >= 30 -> packageManager.backgroundPermissionOptionLabel
+            Build.VERSION.SDK_INT >= 29 -> getString(R.string.background_always_label)
+            else -> getString(R.string.location)
+        }
+        val instructions = if (Build.VERSION.SDK_INT >= 29) getString(R.string.background_settings_first, option)
+            else getString(R.string.background_settings_legacy)
+        val message = android.text.SpannableStringBuilder()
+        if (backgroundFailure && !active) {
+            message.append(when {
+                !backgroundAccess.permitted() -> getString(R.string.background_failure_permission, option)
+                !backgroundAccess.supported() -> getString(R.string.background_failure_provider)
+                !backgroundAccess.registered(widgetId) -> getString(R.string.background_failure_registration)
+                else -> getString(R.string.background_retry)
+            })
+            message.setSpan(android.text.style.StyleSpan(Typeface.BOLD), 0, message.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            message.append("\n\n")
+        }
+        message.append(instructions).append("\n\n").append(getString(when {
+            pendingBackgroundFollow -> R.string.background_setup_pending
+            !backgroundAccess.permitted() -> R.string.background_permission_missing
+            !backgroundAccess.supported() -> R.string.background_unavailable
+            !active -> R.string.background_off
             else -> R.string.location_following
-        })
+        }))
+        backgroundStatus.text = message
+    }
+    private fun completeBackgroundSetup() {
+        if (pendingBackgroundFollow) backgroundFailure = true
+        if (pendingBackgroundFollow && settings.followCurrent && backgroundAccess.permitted() && backgroundAccess.supported()) {
+            settings.backgroundFollow = true
+            save(); BackgroundLocation.sync(this, force = true)
+        }
+        pendingBackgroundFollow = false
+        updateBackgroundStatus()
     }
     private fun requestBackgroundPermission() {
+        updateBackgroundStatus()
         if (!access.permitted()) { continueBackgroundPermission = true; requestLocation(); return }
-        if (BackgroundLocation.permitted(this)) { BackgroundLocation.sync(this, force = true); updateBackgroundStatus(); return }
+        if (backgroundAccess.permitted()) { completeBackgroundSetup(); return }
         if (Build.VERSION.SDK_INT == 29) requestPermissions(arrayOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION), 22)
         else if (Build.VERSION.SDK_INT >= 30) {
             val option = packageManager.backgroundPermissionOptionLabel
             AlertDialog.Builder(this).setTitle(R.string.background_permission_title)
                 .setMessage(getString(R.string.background_permission_instructions, option))
-                .setNegativeButton(R.string.not_now, null)
-                .setPositiveButton(R.string.open_settings) { _, _ -> startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:$packageName"))) }.show()
+                .setNegativeButton(R.string.not_now) { _, _ -> backgroundFailure = true; pendingBackgroundFollow = false; updateBackgroundStatus() }
+                .setOnCancelListener { backgroundFailure = true; pendingBackgroundFollow = false; updateBackgroundStatus() }
+                .setPositiveButton(R.string.open_settings) { _, _ -> awaitingBackgroundSettings = true; startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:$packageName"))) }.show()
         }
         updateBackgroundStatus()
     }

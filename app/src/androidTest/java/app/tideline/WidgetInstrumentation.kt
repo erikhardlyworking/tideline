@@ -269,6 +269,12 @@ class WidgetInstrumentation : Instrumentation() {
             check(!store.get(99991).followCurrent && store.get(99991).place == "Fixed beach")
             check(kotlin.math.abs(store.get(99991).latitude - 58.006377) < 1e-9)
             check(kotlin.math.abs(store.get(99991).longitude - 7.554759) < 1e-9)
+            val callbacks = mutableListOf<(android.location.Location?) -> Unit>()
+            val fakeAccess = object : LocationAccess(activity) {
+                override fun permitted() = true
+                override fun request(callback: (android.location.Location?) -> Unit) { callbacks += callback }
+            }
+            onUi { MainActivity::class.java.getDeclaredField("access").apply { isAccessible = true }.set(activity, fakeAccess) }
             if (android.os.Build.VERSION.SDK_INT >= 29) {
                 onUi { activity.findViewById<Button>(R.id.search_location).performClick() }
                 waitForIdleSync()
@@ -293,9 +299,8 @@ class WidgetInstrumentation : Instrumentation() {
                     activity.findViewById<android.widget.EditText>(R.id.fixed_location_name).setText("Oslo home")
                     activity.findViewById<android.widget.RadioButton>(R.id.location_mode_current).isChecked = true
                 }
-                // Cancel any permission prompt immediately; this test never grants
-                // or supplies the phone's real location to either app copy.
-                uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
+                // The injected request boundary prevents a system permission
+                // dialog or real-location lookup during these UI-mode checks.
                 waitForIdleSync()
                 onUi {
                     check(activity.findViewById<android.widget.EditText>(R.id.fixed_location_name).visibility == View.GONE)
@@ -306,11 +311,6 @@ class WidgetInstrumentation : Instrumentation() {
             }
             // Inject public demonstration fixes into this activity's request
             // boundary; never mock the phone provider or read its real position.
-            val callbacks = mutableListOf<(android.location.Location?) -> Unit>()
-            val fakeAccess = object : LocationAccess(activity) {
-                override fun permitted() = true
-                override fun request(callback: (android.location.Location?) -> Unit) { callbacks += callback }
-            }
             val otherBeforeCapture = store.get(99992).toJson()
             val capturedFix = android.location.Location("network").apply {
                 latitude = 58.006377; longitude = 7.554759; time = System.currentTimeMillis(); accuracy = 2000f
@@ -356,6 +356,69 @@ class WidgetInstrumentation : Instrumentation() {
                 callbacks.last()(capturedFix)
                 check(!store.get(99991).followCurrent && store.get(99991).fixedLatitude == capturedFix.latitude)
             }
+            if (android.os.Build.VERSION.SDK_INT >= 30) {
+                var allowed = false
+                var providers = false
+                var registered = false
+                val backgroundAccess = object : BackgroundAccess(context) {
+                    override fun permitted() = allowed
+                    override fun supported() = allowed && providers
+                    override fun registered(widgetId: Int) = registered
+                }
+                onUi {
+                    MainActivity::class.java.getDeclaredField("backgroundAccess").apply { isAccessible = true }.set(activity, backgroundAccess)
+                    activity.findViewById<android.widget.RadioButton>(R.id.location_mode_current).isChecked = true
+                }
+                fun backgroundSwitch() = activity.findViewById<android.widget.Switch>(R.id.background_follow_toggle)
+                fun clickDialog(id: Int) {
+                    onUi { android.view.inspector.WindowInspector.getGlobalWindowViews().mapNotNull { it.findViewById<Button>(id) }.last().performClick() }
+                    waitForIdleSync()
+                }
+                fun consent() {
+                    onUi {
+                        backgroundSwitch().performClick()
+                        check(!backgroundSwitch().isChecked && !store.get(99991).backgroundFollow) { "Switch enabled before permission/setup finished" }
+                    }
+                    waitForIdleSync(); clickDialog(android.R.id.button1)
+                }
+                fun assertOffWithBoldReason() {
+                    onUi {
+                        check(!backgroundSwitch().isChecked && !store.get(99991).backgroundFollow)
+                        val message = activity.findViewById<TextView>(R.id.background_follow_status).text as android.text.Spanned
+                        check(message.getSpans(0, message.length, android.text.style.StyleSpan::class.java).any { it.style == android.graphics.Typeface.BOLD }) { "Missing bold reason for failed background setup" }
+                    }
+                }
+                consent() // Foreground access is faked; background is denied.
+                onUi { check(!backgroundSwitch().isChecked && !store.get(99991).backgroundFollow) }
+                clickDialog(android.R.id.button2) // Decline Android-settings setup.
+                assertOffWithBoldReason()
+                allowed = true; providers = false
+                consent(); assertOffWithBoldReason() // No usable provider.
+                providers = true; registered = false
+                consent(); assertOffWithBoldReason() // Registration failed.
+                registered = true
+                consent()
+                onUi { check(backgroundSwitch().isChecked && store.get(99991).backgroundFollow) }
+                allowed = false
+                onUi { activity.onWindowFocusChanged(true) }
+                assertOffWithBoldReason() // Permission revoked while selected.
+                allowed = true
+                onUi {
+                    activity.onWindowFocusChanged(true)
+                    check(!backgroundSwitch().isChecked && !store.get(99991).backgroundFollow) { "Permission alone re-enabled following without consent" }
+                    check(activity.findViewById<TextView>(R.id.background_follow_status).text.startsWith(context.getString(R.string.background_retry)))
+                }
+                consent()
+                providers = false
+                onUi { activity.onWindowFocusChanged(true) }
+                assertOffWithBoldReason()
+                providers = true
+                consent()
+                registered = false
+                onUi { activity.onWindowFocusChanged(true) }
+                assertOffWithBoldReason()
+                onUi { activity.findViewById<android.widget.RadioButton>(R.id.location_mode_fixed).isChecked = true }
+            }
             val tapMonitor = addMonitor(MainActivity::class.java.name, null, false)
             val idsBeforeEditing = WidgetUpdates.ids(context).sorted()
             val otherWidgetBeforeEditing = store.get(99992).toJson()
@@ -391,7 +454,7 @@ class WidgetInstrumentation : Instrumentation() {
                 }
                 waitForIdleSync()
             }
-            output.putString("result", "One-off Use my location remains fixed, focuses the name, preserves other widgets, handles delayed fixes/manual edits/failure/permission callback; Current name is fixed with no editable field. Reduced footer gap and 66 audited native renders passed, plus coastal search, globe, polar coverage, widget editing and existing regressions.")
+            output.putString("result", "Background switch remains off through consent/settings setup, permission denial, missing providers and registration failure; enables only when supported, turns off on revocation/provider or registration loss, shows bold failure reasons, and never re-enables from permission alone. Fixed capture, Current label, footer spacing, 66 renders and existing coastal/globe/widget regressions passed.")
         } catch (error: Throwable) {
             output.putString("failure", error.stackTraceToString())
             outcome = Activity.RESULT_CANCELED

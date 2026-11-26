@@ -14,6 +14,8 @@ If you choose current location, TideLine requests approximate location from Andr
 
 Background following is off by default. If you enable it, TideLine accesses approximate location in the background, including when the app is closed, to keep opted-in tide widgets near your location as you move. A disclosure appears before permission setup. Android background location permission is required on Android 10 and later. Only the latest fix is retained on this device. Turn this option off to stop TideLine's background location requests. Fixed-location and foreground-only modes remain available.
 
+The following switch stays off while permission setup is incomplete. If access is unavailable, or background updates cannot be registered, it stays off and explains the reason. A visible selected setting is switched off when the app detects that permission or location support has been lost; re-enable it after resolving the cause.
+
 TideLine requests occasional network/passive system locations, not continuous GPS tracking. Android controls availability, precision and delivery. The operating system's location service may use network services under your device's location settings; TideLine itself does not upload location or make forecast requests.
 
 ## Retention, security and deletion
