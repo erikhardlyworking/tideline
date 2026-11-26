@@ -102,7 +102,8 @@ def main():
                         "sha256": sha256(raw), **attributes})
         blocks.append(compressed)
         offset += len(compressed)
-    for row, col, mask in tile_iterator(geometry["band1"]):
+    tide_mask = geometry["band1"] & ((geometry["lat"] >= -60) & (geometry["lat"] <= 72))[:, None]
+    for row, col, mask in tile_iterator(tide_mask):
         ap = values[:, :, row:row + mask.shape[0], col:col + mask.shape[1]][:, :, mask]
         raw = np.packbits(mask, bitorder="little").tobytes() + encode_words(ap.astype("<f8"), "xor_shuffle")
         add(f"tide/{row}/{col}", raw, rows=mask.shape[0], cols=mask.shape[1], cells=int(mask.sum()), mask_bytes=(mask.size + 7) // 8)
@@ -123,7 +124,7 @@ def main():
     add("astronomy", basis.tobytes())
     header = {"version": 1, "model": "EOT20 final", "constituents": NAMES, "lat0": float(geometry["lat"][0]),
               "lon0": float(geometry["lon"][0]), "step": .125, "rows": len(geometry["lat"]), "cols": len(geometry["lon"]),
-              "tile_side": TILE, "band_extra_cells": 1, "byte_order": "little", "representation": "original float64 amplitude cm / phase degrees",
+              "tile_side": TILE, "band_extra_cells": 1, "coverage_south": -60.0, "coverage_north": 72.0, "byte_order": "little", "representation": "original float64 amplitude cm / phase degrees",
               "encoding": "bitwise xor + byte shuffle, lossless zlib; independently compressed tiles", "quantization": "none",
               "astronomy": astro, "license": "CC BY 4.0", "attribution": "Hart-Davis et al. (2021), doi:10.17882/79489; converted and subsetted",
               "water_source": "Natural Earth 10m ocean 5.1.1, public domain; Caspian explicitly included", "entries": entries}

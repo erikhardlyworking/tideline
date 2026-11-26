@@ -25,8 +25,8 @@ android {
         applicationId = "app.tideline"
         minSdk = 26
         targetSdk = 36
-        versionCode = 9
-        versionName = "0.3.1"
+        versionCode = 10
+        versionName = "0.4.0"
         testInstrumentationRunner = "app.tideline.WidgetInstrumentation"
     }
     signingConfigs {
@@ -47,7 +47,9 @@ android {
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     buildFeatures { buildConfig = true }
-    androidResources { noCompress += "tpk" }
+    // AAPT transparently expands .gz assets and removes their suffix, so the
+    // already-compressed place index uses .idx to preserve its exact bytes.
+    androidResources { noCompress += listOf("tpk", "idx") }
     sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/tide-assets"))
     lint { abortOnError = true }
     packaging { resources.excludes += setOf("META-INF/LICENSE*", "META-INF/NOTICE*") }

@@ -10,4 +10,10 @@
     <item name="fixed_longitude" type="id" />
     <item name="fixed_location_name" type="id" />
     <item name="save_fixed_location" type="id" />
+    <item name="show_location_name" type="id" />
+    <item name="search_location" type="id" />
+    <item name="place_search_query" type="id" />
+    <item name="place_search_results" type="id" />
+    <item name="coordinate_toggle" type="id" />
+    <item name="location_globe" type="id" />
 </resources>

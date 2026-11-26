@@ -7,12 +7,18 @@ Hart-Davis, M., Piccioni, G., Dettmering, D., Schwatke, C., Passaro, M. and Seit
 Dataset: https://doi.org/10.17882/79489
 Paper: https://doi.org/10.5194/essd-13-3869-2021
 Creative Commons Attribution 4.0 International: https://creativecommons.org/licenses/by/4.0/
-Changes: original float64 ocean-height harmonic amplitude/phase values selected to a global coastal band and losslessly re-encoded. All 17 supplied constituents retained. Ocean-loading files are not used. No endorsement by the authors is implied.
+Changes: original float64 ocean-height harmonic amplitude/phase values selected to a coastal band from 60°S to 72°N and losslessly re-encoded. Polar tide cells are excluded; mainland northern Norway and Cape Horn remain included. All 17 supplied constituents retained. Ocean-loading files are not used. No endorsement by the authors is implied.
 
 Natural Earth
 Ocean shoreline ne_10m_ocean 5.1.1, public domain.
 https://www.naturalearthdata.com/about/terms-of-use/
-Converted into independently compressed geographic polygon tiles. The Caspian is included in the shoreline selection at the user's request; EOT20 provides no valid tide coefficients there.
+Converted into independently compressed geographic polygon tiles and a low-resolution ocean mask for the offline globe. The global shoreline is retained independently of the polar tide limits. The Caspian is included in the shoreline selection at the user's request; EOT20 provides no valid tide coefficients there.
+
+GeoNames coastal place search
+GeoNames geographical database, https://www.geonames.org/
+Source: https://download.geonames.org/export/dump/ (cities1000.zip and admin1CodesASCII.txt).
+Creative Commons Attribution 4.0 International: https://creativecommons.org/licenses/by/4.0/
+Changes: selected towns whose centres are within 30 km of a retained tide cell; retained names, alternate names, country/region and coordinates; ordered by population and gzip-compressed. Names and coordinates may be incomplete or approximate; inclusion does not guarantee usable marine tide support. No GeoNames endorsement is implied. Search uses only this bundled index, without API requests.
 
 Astronomical basis
 Generated using pyTMD 2.2.9 (MIT), with FES nodal corrections and short-period minor inference. Supplied constituents are not inferred twice; long-period minor inference is disabled. Daily slowly varying complex envelopes are combined with exact carrier frequencies at every requested instant. Tables cover 2020–2040; they are not a repeating single-year forecast. UTC approximates UT1; the pinned timescale TT−UT1 values are included in the generated basis.

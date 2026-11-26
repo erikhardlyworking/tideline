@@ -18,6 +18,8 @@ enum class LocationProblem { TOO_FAR_FROM_COAST, NO_COVERAGE }
 class TideModel(val pack: ModelPack) {
     fun locate(point: GeoPoint, shoreLimitKm: Double = 30.0): LocationResult {
         require(shoreLimitKm in 1.0..30.0)
+        if (point.latitude !in pack.minimumTideLatitude..pack.maximumTideLatitude)
+            return LocationResult.Unavailable("Polar tide data is not included.")
         val nearestStored = pack.nearestCell(point) ?: return LocationResult.Unavailable("No tide data available.")
         if (nearestStored.distanceKm > 30.0)
             return LocationResult.Unavailable("Too far from coast", LocationProblem.TOO_FAR_FROM_COAST, nearestStored.distanceKm)

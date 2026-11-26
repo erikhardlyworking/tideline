@@ -10,7 +10,7 @@ SOURCE_FILES = [
     'docs/DATA_NOTICES.txt', 'docs/PYTMD_LICENSE.txt',
     'docs/site/index.html', 'docs/site/privacy.html',
     'tools/build_android_data.py', 'tools/coastal.py', 'tools/common.py',
-    'tools/download_inputs.py', 'tools/prepare_publication.py',
+    'tools/download_inputs.py', 'tools/prepare_publication.py', 'tools/build_place_index.py', 'tools/build_globe_map.py',
     'tools/render_privacy.py', 'tools/task.py', 'tools/verify_model_pack.py',
 ]
 EXCLUDE = {'build','.gradle','__pycache__','.idea','.git','local'}

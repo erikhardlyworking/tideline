@@ -1,6 +1,6 @@
 # TideLine Privacy Policy
 
-Effective date: 30 October 2026
+Effective date: 26 November 2026
 
 TideLine is developed by erikhardlyworking. For privacy questions or support, email workinghardlyforyou@gmail.com. You can also report issues through https://github.com/erikhardlyworking/tideline/issues. Please do not put private location details in a public issue.
 
@@ -8,7 +8,7 @@ TideLine is developed by erikhardlyworking. For privacy questions or support, em
 
 TideLine calculates astronomical tide predictions on your device from bundled ocean-tide data. It has no Internet permission, developer server, advertising, analytics, account system, or crash-reporting service. The app does not transmit your location or settings to the developer or third parties.
 
-If you choose current location, TideLine requests approximate location from Android. The latest coordinates, accuracy and fix time are stored locally to select nearby tide data. A fixed location and its optional name are also stored locally. Appearance and forecast settings are retained separately for each widget. Older fixes are replaced; TideLine does not record a travel history. Temporary calculation caches stay in app memory.
+If you choose current location, TideLine requests approximate location from Android. The latest coordinates, accuracy and fix time are stored locally to select nearby tide data. Fixed coordinates and names for both location modes are also stored locally. Showing a name on a widget is optional. Place-name searches use a bundled GeoNames coastal town index entirely on your device; search terms are not transmitted or retained as a search history. Appearance and forecast settings are retained separately for each widget. Older fixes are replaced; TideLine does not record a travel history. Temporary calculation and place-search caches stay in app memory.
 
 ## Optional location while the app is closed
 

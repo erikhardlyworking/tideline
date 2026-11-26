@@ -11,6 +11,8 @@ import android.location.Location
 import android.os.*
 import android.text.InputType
 import android.text.TextUtils
+import android.text.TextWatcher
+import android.text.Editable
 import android.util.TypedValue
 import android.view.*
 import android.widget.*
@@ -32,6 +34,7 @@ class MainActivity : Activity() {
     private lateinit var low: TextView
     private lateinit var source: TextView
     private lateinit var locationStatus: TextView
+    private lateinit var globe: ImageView
     private var widgetId = 0
     private var launchedFromApp = false
     private var configuring = false
@@ -101,6 +104,13 @@ class MainActivity : Activity() {
         children.forEachIndexed { i, child -> line.addView(child, LinearLayout.LayoutParams(0, -2, 1f).apply { if (i > 0) leftMargin = dp(8) }) }
         parent.addView(line)
     }
+    private fun watch(field: EditText, change: (String) -> Unit) {
+        field.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { change(s.toString()) }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+    }
 
     private fun buildScreen() {
         val scroll = ScrollView(this).apply { isFillViewport = true; setBackgroundColor(Color.rgb(244, 247, 249)) }
@@ -160,6 +170,8 @@ class MainActivity : Activity() {
         detail.addView(text(getString(R.string.datum_note), 12f, muted))
 
         val location = card(getString(R.string.location))
+        globe = ImageView(this).apply { id = R.id.location_globe; scaleType = ImageView.ScaleType.FIT_CENTER }
+        location.addView(globe, LinearLayout.LayoutParams(-1, dp(148)))
         val modes = RadioGroup(this)
         val follow = RadioButton(this).apply { id = R.id.location_mode_current; text = getString(R.string.use_current_location); minHeight = dp(48) }
         val specific = RadioButton(this).apply { id = R.id.location_mode_fixed; text = getString(R.string.specific_location); minHeight = dp(48) }
@@ -167,30 +179,59 @@ class MainActivity : Activity() {
         modes.check(if (settings.followCurrent) follow.id else specific.id)
         location.addView(modes)
         locationStatus = text("", 12f, muted); location.addView(locationStatus)
+        var changingName = false
+        val name = EditText(this).apply { id = R.id.fixed_location_name; hint = getString(R.string.place_name); setText(settings.locationName()); setSingleLine(true); inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS }
+        location.addView(name)
+        watch(name) { value ->
+            if (!changingName) {
+                if (settings.followCurrent) settings.currentPlace = value.trim() else settings.place = value.trim()
+                save(); drawCharts()
+            }
+        }
+        location.addView(Switch(this).apply {
+            id = R.id.show_location_name; text = getString(R.string.show_location_name); isChecked = settings.showLocationName; minHeight = dp(48)
+            setOnCheckedChangeListener { _, checked -> settings.showLocationName = checked; save(); drawCharts() }
+        })
+        location.addView(text(getString(R.string.location_name_help), 12f, muted))
         val fixed = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; visibility = if (settings.followCurrent) View.GONE else View.VISIBLE }
         fun coordinate(hintText: String, value: Double) = EditText(this).apply {
             hint = hintText; inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL or InputType.TYPE_NUMBER_FLAG_SIGNED; setSingleLine(true)
             if (value.isFinite()) setText(String.format(java.util.Locale.ROOT, "%.6f", value))
         }
         fixed.addView(text(getString(R.string.fixed_location_help), 12f, muted))
+        val coordinates = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; visibility = View.GONE }
+        fixed.addView(button(getString(R.string.search_location)) {
+            searchPlaces { place ->
+                settings.latitude = place.latitude; settings.longitude = place.longitude
+                settings.fixedLatitude = place.latitude; settings.fixedLongitude = place.longitude
+                settings.place = place.name; settings.locationAt = 0; settings.accuracy = 0f
+                changingName = true; name.setText(place.name); changingName = false
+                findViewById<EditText>(R.id.fixed_latitude).setText(String.format(java.util.Locale.ROOT, "%.6f", place.latitude))
+                findViewById<EditText>(R.id.fixed_longitude).setText(String.format(java.util.Locale.ROOT, "%.6f", place.longitude))
+                save(); recalculate(); updateLocationStatus()
+            }
+        }.apply { id = R.id.search_location })
+        fixed.addView(button(getString(R.string.enter_coordinates)) {
+            coordinates.visibility = if (coordinates.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+        }.apply { id = R.id.coordinate_toggle })
         val latitude = coordinate(getString(R.string.latitude), settings.latitude).apply { id = R.id.fixed_latitude }
         val longitude = coordinate(getString(R.string.longitude), settings.longitude).apply { id = R.id.fixed_longitude }
         fun field(label: Int, input: View) = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; addView(text(getString(label), 12f, muted)); addView(input)
         }
-        row(fixed, field(R.string.latitude, latitude), field(R.string.longitude, longitude))
-        val name = EditText(this).apply { id = R.id.fixed_location_name; hint = getString(R.string.place_name); setText(settings.place); setSingleLine(true); inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS }
-        fixed.addView(name)
-        fixed.addView(button(getString(R.string.set_location)) {
+        row(coordinates, field(R.string.latitude, latitude), field(R.string.longitude, longitude))
+        coordinates.addView(button(getString(R.string.set_location)) {
             val lat = latitude.text.toString().trim().replace(',', '.').toDoubleOrNull()
             val lon = longitude.text.toString().trim().replace(',', '.').toDoubleOrNull()
             if (lat == null || lon == null || !lat.isFinite() || !lon.isFinite() || lat !in -90.0..90.0 || lon !in -180.0..180.0) {
                 latitude.error = getString(R.string.invalid_coordinates)
             } else {
                 settings.latitude = lat; settings.longitude = lon; settings.place = name.text.toString().trim(); settings.locationAt = 0; settings.accuracy = 0f
+                settings.fixedLatitude = lat; settings.fixedLongitude = lon
                 save(); recalculate()
             }
         }.apply { id = R.id.save_fixed_location })
+        fixed.addView(coordinates)
         location.addView(fixed)
         val locateButton = button(getString(R.string.use_my_location)) { if (follow.isChecked) requestLocation() else follow.isChecked = true }
         location.addView(locateButton)
@@ -212,17 +253,24 @@ class MainActivity : Activity() {
         }
         modes.setOnCheckedChangeListener { _, selected ->
             val checked = selected == follow.id
+            if (checked && !settings.followCurrent && settings.point() != null) {
+                settings.fixedLatitude = settings.latitude; settings.fixedLongitude = settings.longitude
+            }
             settings.followCurrent = checked; fixed.visibility = if (checked) View.GONE else View.VISIBLE
             background.visibility = if (checked) View.VISIBLE else View.GONE
-            if (checked) { settings.latitude = Double.NaN; settings.longitude = Double.NaN; settings.place = ""; settings.locationAt = 0 }
+            if (checked) { settings.latitude = Double.NaN; settings.longitude = Double.NaN; settings.locationAt = 0 }
             if (!checked) {
                 access.cancel()
+                if (settings.fixedLatitude.isFinite() && settings.fixedLongitude.isFinite()) {
+                    settings.latitude = settings.fixedLatitude; settings.longitude = settings.fixedLongitude
+                    settings.locationAt = 0; settings.accuracy = 0f
+                }
                 if (settings.point() != null) {
                     latitude.setText(String.format(java.util.Locale.ROOT, "%.6f", settings.latitude))
                     longitude.setText(String.format(java.util.Locale.ROOT, "%.6f", settings.longitude))
-                    name.setText(settings.place)
                 }
             }
+            changingName = true; name.setText(settings.locationName()); changingName = false
             save(); recalculate(); updateBackgroundStatus(); if (checked) requestLocation()
         }
         updateLocationStatus()
@@ -297,6 +345,54 @@ class MainActivity : Activity() {
         try { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(getString(url)))) }
         catch (_: ActivityNotFoundException) { Toast.makeText(this, R.string.no_browser, Toast.LENGTH_SHORT).show() }
     }
+    private fun searchPlaces(select: (CoastalPlaces.Place) -> Unit) {
+        val panel = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(8), dp(20), 0) }
+        panel.addView(text(getString(R.string.place_search_help), 13f, muted))
+        val query = EditText(this).apply { id = R.id.place_search_query; hint = getString(R.string.place_search_hint); setSingleLine(true); inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS }
+        panel.addView(query)
+        val status = text(getString(R.string.place_search_start), 12f, muted); panel.addView(status)
+        val results = ListView(this).apply { id = R.id.place_search_results }
+        panel.addView(results, LinearLayout.LayoutParams(-1, dp(260)))
+        val dialog = AlertDialog.Builder(this).setTitle(R.string.search_location).setView(panel).setNegativeButton(R.string.cancel, null).create()
+        var matches = emptyList<CoastalPlaces.Place>()
+        var generation = 0
+        var pending: Runnable? = null
+        watch(query) { input ->
+            val token = ++generation
+            pending?.let { handler.removeCallbacks(it) }
+            matches = emptyList(); results.adapter = null
+            if (input.trim().length < 2) status.text = getString(R.string.place_search_start)
+            else {
+                status.text = getString(R.string.calculating)
+                val task = Runnable {
+                    if (!isDestroyed && dialog.isShowing) executor.execute {
+                        val found = runCatching { CoastalPlaces.search(applicationContext, input) }
+                        handler.post {
+                            if (!isDestroyed && dialog.isShowing && token == generation) {
+                                matches = found.getOrDefault(emptyList())
+                                status.text = getString(when {
+                                    found.isFailure -> R.string.place_search_failed
+                                    matches.isEmpty() -> R.string.place_search_empty
+                                    else -> R.string.place_search_count
+                                }, matches.size)
+                                results.adapter = object : ArrayAdapter<CoastalPlaces.Place>(this, android.R.layout.simple_list_item_2, android.R.id.text1, matches) {
+                                    override fun getView(position: Int, convertView: View?, parent: ViewGroup): View = super.getView(position, convertView, parent).apply {
+                                        val place = getItem(position)!!
+                                        findViewById<TextView>(android.R.id.text1).apply { text = place.name; setSingleLine(true); ellipsize = TextUtils.TruncateAt.END }
+                                        findViewById<TextView>(android.R.id.text2).apply { text = place.description(); setSingleLine(true); ellipsize = TextUtils.TruncateAt.END }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                pending = task; handler.postDelayed(task, 250)
+            }
+        }
+        results.setOnItemClickListener { _, _, position, _ -> matches.getOrNull(position)?.let { select(it); dialog.dismiss() } }
+        dialog.setOnDismissListener { generation++; pending?.let { handler.removeCallbacks(it) } }
+        dialog.show()
+    }
     private fun applyTheme(index: Int) { settings.theme(index); save(); buildScreen(); drawCharts() }
     private fun save() { store.put(widgetId, settings); WidgetUpdates.enqueue(this); WidgetUpdates.schedule(this) }
     private fun recalculate() {
@@ -305,9 +401,12 @@ class MainActivity : Activity() {
         direction.text = getString(R.string.calculating)
         executor.execute {
             val value = TideRepository.snapshot(applicationContext, configuration)
+            val map = runCatching { GlobeRenderer.bitmap(applicationContext, configuration.point()) }.getOrNull()
             handler.post {
                 if (!isFinishing && !isDestroyed && generation == requestGeneration) {
                     snapshot = value; drawCharts()
+                    globe.setImageBitmap(map)
+                    globe.contentDescription = if (configuration.point() == null) getString(R.string.choose_location) else getString(R.string.globe_description, configuration.label())
                 }
             }
         }
@@ -347,7 +446,7 @@ class MainActivity : Activity() {
                 getString(R.string.location_age, PhoneFormats.dateTime(this, settings.locationAt), settings.accuracy.roundToInt()) + "\n"
             } else ""
             details + getString(if (settings.backgroundFollow && BackgroundLocation.permitted(this)) R.string.location_following else R.string.location_stored)
-        } else settings.label()
+        } else settings.label() + (settings.point()?.let { String.format(java.util.Locale.getDefault(), "\n%.4f°, %.4f°", it.latitude, it.longitude) } ?: "")
     }
     private fun requestLocation() {
         if (stopped || !settings.followCurrent) return
@@ -363,13 +462,13 @@ class MainActivity : Activity() {
             if (stopped || !settings.followCurrent) return@request
             if (location == null) locationStatus.text = getString(R.string.location_failed)
             else {
-                settings.latitude = location.latitude; settings.longitude = location.longitude; settings.place = ""
+                settings.latitude = location.latitude; settings.longitude = location.longitude
                 settings.locationAt = location.time; settings.accuracy = location.accuracy
                 // Refresh the single retained fix of other current-location widgets.
                 for (id in WidgetUpdates.ids(this)) {
                     if (id == widgetId) continue
                     store.update(id) { other -> if (other.followCurrent && location.time >= other.locationAt) {
-                        other.latitude = location.latitude; other.longitude = location.longitude; other.place = ""; other.locationAt = location.time; other.accuracy = location.accuracy
+                        other.latitude = location.latitude; other.longitude = location.longitude; other.locationAt = location.time; other.accuracy = location.accuracy
                     } }
                 }
                 save(); updateLocationStatus(); recalculate()

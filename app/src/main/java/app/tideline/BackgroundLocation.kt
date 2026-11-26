@@ -64,7 +64,7 @@ object BackgroundLocation {
         val store = SettingsStore(context)
         for (id in ids) if (store.contains(id)) store.update(id) { value ->
             if (value.followCurrent && value.backgroundFollow && (location.time > value.locationAt || value.locationAt > System.currentTimeMillis() + 60_000)) {
-                value.latitude = location.latitude; value.longitude = location.longitude; value.place = ""
+                value.latitude = location.latitude; value.longitude = location.longitude
                 value.locationAt = location.time; value.accuracy = location.accuracy
             }
         }

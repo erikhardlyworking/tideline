@@ -15,6 +15,9 @@ class ChartAudit {
     val guides = mutableListOf<Guide>()
     data class Tick(val minute: Int, val length: Float)
     val ticks = mutableListOf<Tick>()
+    data class HeightMark(val y: Float, val labelSignY: Float)
+    val heightMarks = mutableListOf<HeightMark>()
+    var textHaloAlpha = 0
 }
 
 object ChartRenderer {
@@ -46,6 +49,7 @@ object ChartRenderer {
         val left = padding; val right = width - padding
         val normal = Typeface.create("sans-serif", Typeface.NORMAL)
         val medium = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        val bold = Typeface.create("sans-serif", Typeface.BOLD)
         paint.typeface = medium; paint.textSize = textSize
         if (tide.signal == null) {
             paint.textAlign = Paint.Align.CENTER; paint.color = s.foreground
@@ -66,20 +70,35 @@ object ChartRenderer {
         val footerSpace = max(dp, right - left - 12 * dp)
         paint.textSize *= min(1f, footerSpace / paint.measureText(now))
         val nowSize = paint.textSize
+        val nowWidth = paint.measureText(now)
+        val nameGap = paint.measureText("  ")
+        paint.typeface = bold
+        // Keep the time/height legible; only the optional name is ellipsized.
+        val nameSpace = max(0f, footerSpace - nowWidth - nameGap)
+        val locationName = if (s.showLocationName && nameSpace >= paint.measureText("…"))
+            android.text.TextUtils.ellipsize(s.locationName(), android.text.TextPaint(paint), nameSpace, android.text.TextUtils.TruncateAt.END).toString()
+            else ""
+        val nameWidth = if (locationName.isEmpty()) 0f else nameGap + paint.measureText(locationName)
+        paint.typeface = normal
         val nowBaseline = height - verticalPadding - paint.descent()
-        val nowLeft = (width - paint.measureText(now)) / 2
-        val nowRect = RectF(nowLeft, nowBaseline + paint.ascent(), nowLeft + paint.measureText(now), nowBaseline + paint.descent())
+        val nowLeft = (width - nowWidth - nameWidth) / 2
+        val nowRect = RectF(nowLeft, nowBaseline + paint.ascent(), nowLeft + nowWidth + nameWidth, nowBaseline + paint.descent())
 
         paint.typeface = medium; paint.textSize = textSize
         val markLeft = right - 8 * dp; val labelRight = markLeft - 4 * dp
-        val labelHalf = (paint.descent() - paint.ascent()) / 2
-        val half = max(dp, axis - verticalPadding - labelHalf)
+        // Align the minus sign itself with the height guide, not the font's
+        // ascent/descent box. Reserve footer space symmetrically around zero.
+        val signBounds = Rect().also { paint.getTextBounds("-", 0, 1, it) }
+        val signOffset = -(signBounds.top + signBounds.bottom) / 2f
+        val aboveLabel = -paint.ascent() - signOffset
+        val belowLabel = paint.descent() + signOffset
+        val half = max(dp, min(axis - verticalPadding - aboveLabel, nowRect.top - 3 * dp - belowLabel - axis))
         fun heightY(metres: Double) = axis - (metres / tide.scaleMetres).toFloat().coerceIn(-1f, 1f) * half
         val allValues = listOf(tide.maximum24, tide.minimum24)
         val actualYs = levelIndices.map { heightY(allValues[it]) }
-        val topCentre = verticalPadding + labelHalf
-        val bottomCentre = max(topCentre, nowRect.top - 2 * dp - labelHalf)
-        val separation = labelHalf * 2 + 2 * dp
+        val topCentre = verticalPadding + aboveLabel
+        val bottomCentre = max(topCentre, nowRect.top - 2 * dp - belowLabel)
+        val separation = aboveLabel + belowLabel + 2 * dp
         var levelYs = actualYs.map { it.coerceIn(topCentre, bottomCentre) }
         if (levelYs.size == 2 && levelYs[1] - levelYs[0] < separation) {
             val middle = ((levelYs[0] + levelYs[1]) / 2)
@@ -87,7 +106,7 @@ object ChartRenderer {
             levelYs = listOf(middle - separation / 2, middle + separation / 2)
         }
         val levelTexts = levelIndices.map { cm(allValues[it]) }
-        val levelBaselines = levelYs.map { it - (paint.ascent() + paint.descent()) / 2 }
+        val levelBaselines = levelYs.map { it + signOffset }
         val levelRects = levelTexts.indices.map { i ->
             RectF(labelRight - paint.measureText(levelTexts[i]), levelBaselines[i] + paint.ascent(), labelRight, levelBaselines[i] + paint.descent())
         }
@@ -157,6 +176,8 @@ object ChartRenderer {
         }
         horizontal(axis, s.foreground, .6f * dp)
         canvas.save()
+        // Text is drawn over the continuous tide curve with a translucent halo.
+        // Only ticks and straight guides avoid labels.
         annotations.forEach { canvas.clipOutRect(RectF(it).apply { inset(-2 * dp, -dp) }) }
         paint.color = s.foreground; paint.strokeWidth = .6f * tickScale
         for (tick in ticks) {
@@ -168,6 +189,7 @@ object ChartRenderer {
         }
         // The rendered window starts here, even between clock-aligned ticks.
         canvas.drawCircle(left, axis, 2.6f * dp, paint)
+        canvas.restore()
         val tangents = FloatArray(samples.size) { i ->
             when (i) {
                 0 -> ys[1] - ys[0]
@@ -185,12 +207,13 @@ object ChartRenderer {
         canvas.drawPath(path, paint)
         paint.style = Paint.Style.FILL
         canvas.drawCircle(left, ys[0], 2.6f * dp, paint)
-        canvas.restore()
-        val halo = if (Color.alpha(s.background) >= 200) s.background else if (Color.luminance(s.foreground) > .5) 0xc0000000.toInt() else 0xc0ffffff.toInt()
+        val haloBase = if (Color.alpha(s.background) >= 200) s.background else if (Color.luminance(s.foreground) > .5) Color.BLACK else Color.WHITE
+        val halo = withAlpha(haloBase, 145)
+        audit?.textHaloAlpha = Color.alpha(halo)
         fun text(value: String, x: Float, baseline: Float, colour: Int) {
-            paint.style = Paint.Style.STROKE; paint.strokeWidth = 2.4f * dp; paint.color = halo
+            paint.style = Paint.Style.STROKE; paint.strokeWidth = 1.25f * dp; paint.color = halo
             canvas.drawText(value, x, baseline, paint)
-            paint.style = Paint.Style.FILL; paint.color = colour
+            paint.style = Paint.Style.FILL; paint.color = withAlpha(colour, 235)
             canvas.drawText(value, x, baseline, paint)
         }
         paint.textAlign = Paint.Align.LEFT
@@ -206,12 +229,18 @@ object ChartRenderer {
             text(levelTexts[i], labelRight, levelBaselines[i], secondary)
             val at = actualYs[i]
             paint.color = secondary; paint.strokeWidth = .45f * dp
-            if (abs(at - levelYs[i]) > dp) canvas.drawLine(labelRight + dp, levelYs[i], markLeft, at, paint)
+            if (levelYs.size == 2 && abs(at - levelYs[i]) > dp) canvas.drawLine(labelRight + dp, levelYs[i], markLeft, at, paint)
+            canvas.drawLine(markLeft, at, right, at, paint)
+            audit?.heightMarks?.add(ChartAudit.HeightMark(at, levelBaselines[i] - signOffset))
             audit?.labels?.add(ChartAudit.Label(if (levelIndices[i] == 0) "maximum" else "minimum", levelTexts[i], RectF(levelRects[i])))
         }
         paint.typeface = normal; paint.textSize = nowSize; paint.textAlign = Paint.Align.LEFT
         text(now, nowLeft, nowBaseline, secondary)
-        audit?.labels?.add(ChartAudit.Label("asof", now, RectF(nowRect)))
+        if (locationName.isNotEmpty()) {
+            paint.typeface = bold
+            text(locationName, nowLeft + nowWidth + nameGap, nowBaseline, secondary)
+        }
+        audit?.labels?.add(ChartAudit.Label("asof", now + if (locationName.isEmpty()) "" else "  $locationName", RectF(nowRect)))
     }
     fun cm(metres: Double) = String.format(java.util.Locale.getDefault(), "%+d cm", (metres * 100).roundToInt())
     private fun withAlpha(colour: Int, alpha: Int) = (colour and 0x00ffffff) or (alpha shl 24)

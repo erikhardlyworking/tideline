@@ -5,7 +5,8 @@ An offline Android home-screen tide widget. A white tide curve runs around a cen
 - Four-hour default, with 2/3/4/6/12/24-hour forecasts for each widget.
 - New widgets start at 2×2 cells and can be resized.
 - Whole-hour labels, quarter-hour ticks and larger half-hour ticks in shorter views; the centred timestamp identifies the last calculation.
-- Fixed coastal coordinates or approximate current location, with optional background following.
+- Offline search of about 40,000 coastal towns, fixed coordinates or approximate current location, with optional background following.
+- Name either location mode and optionally show its name beside the update time. A small offline globe shows the selected point in settings.
 - Adjustable colours, transparency, label size, line thickness and padding. Launcher-controlled corners and zero vertical padding by default.
 - All 17 EOT20 constituents calculated locally. No Internet permission, accounts, advertising or analytics.
 
@@ -17,9 +18,11 @@ At 64 tested coastal sites with accepted continuous reference series, median RMS
 
 Coverage depends on EOT20 and the mapped coastline. Small harbours and fjords can be unsupported. EOT20 has no Caspian coefficients. The app distinguishes being too far inland from missing model coverage.
 
+Polar tide cells are omitted: latitude coverage is **60°S–72°N**, retaining mainland northern Norway and Cape Horn. The global shoreline is retained for orientation on the globe.
+
 ## Use
 
-Open TideLine and find the **Location** section below Tide details. Choose **Current location** or **Specific location**; a fixed location accepts latitude, longitude and an optional name. Add the widget through the app or the launcher's widget picker. Each widget retains its own location, forecast duration and appearance. Tapping a widget opens its own settings; **Save widget** applies the settings and closes the screen.
+Open TideLine and find the **Location** section below Tide details. Choose **Current location** or **Specific location**. Search coastal towns by name and select a result showing its region and country, or open **Enter coordinates** for an exact point. The globe centres on the selected point. Both modes have editable names (default **Current** when following); **Show location name on widget** adds the name in bold beside the update time/height. Long names are shortened to fit. Search and the globe work offline without location permission. Add the widget through the app or the launcher's widget picker. Each widget retains its own location, forecast duration and appearance. Tapping a widget opens its own settings; **Save widget** applies the settings and closes the screen.
 
 The widget refreshes approximately every 15 minutes; Android can delay updates during sleep or battery saving. It is not a live clock. The centred time and height identify its last calculation. Open the app or tap **Refresh** for an immediate calculation.
 
@@ -57,7 +60,11 @@ If the phone has a Play/release installation, build the debug and test APKs with
 
 ## Bundled data
 
-The build includes the real **30,945,129-byte** `data/packs/tideline-global.tpk`. Its coastal EOT20 harmonic values are encoded losslessly. The pack also contains coastline geometry and astronomy tables for 2020–2040. Its compressed tiles are read directly from the uncompressed Android asset; normal builds require no additional tide-data download.
+The build includes the real **26,895,584-byte** `data/packs/tideline-global.tpk`. Its retained coastal EOT20 harmonic values are encoded losslessly. Polar exclusion removes 4,049,545 bytes from the previous pack without changing any retained coefficient bits. The pack also contains global coastline geometry and astronomy tables for 2020–2040. Its compressed tiles are read directly from the uncompressed Android asset; normal builds require no additional tide-data download.
+
+The app also bundles a 2.39 MB gzip index of 39,803 GeoNames towns within 30 km of retained tide cells, with alternate names and country/region information. The index is not a complete list of beaches or settlements; town centres may not have reachable marine support. Tide coverage is checked after selection. The 17.9 kB globe mask uses the same public-domain Natural Earth ocean geometry as the tide pack. No map or search service is contacted.
+
+To rebuild these optional display/search assets, download `cities1000.zip` and `admin1CodesASCII.txt` from `https://download.geonames.org/export/dump/` into `data/geonames/`, then run `python tools/build_place_index.py` and `python tools/build_globe_map.py` with the existing model geometry and Natural Earth inputs. Normal builds use the bundled assets.
 
 To rebuild the pack, install the pinned Python packages from `requirements.lock.txt` in a virtual environment and run `python tools/task.py data`. This explicitly downloads the approximately 2.33 GB upstream archive. [Data and software notices](docs/DATA_NOTICES.txt) describe sources, licences and conversions.
 
@@ -76,4 +83,4 @@ For support or privacy inquiries, email workinghardlyforyou@gmail.com. Bugs can 
 
 [More apps by this developer on Google Play](https://play.google.com/store/apps/dev?id=6256987868491351341).
 
-Original application code: Apache-2.0. EOT20 data: CC BY 4.0. Natural Earth shoreline: public domain. Astronomical reference: pyTMD, MIT. Full notices and licence texts are retained in the source and app.
+Original application code: Apache-2.0. EOT20 and GeoNames data: CC BY 4.0. Natural Earth shoreline: public domain. Astronomical reference: pyTMD, MIT. Full notices and licence texts are retained in the source and app.

@@ -4,7 +4,7 @@ import hashlib
 
 ROOT = Path(__file__).resolve().parents[1]
 PACK = ROOT / 'data/packs/tideline-global.tpk'
-EXPECTED = '6e07ba773ae1b679a9b4fe7f4b7016f0dfa6708516e3541a8ed08b69660c06e8'
+EXPECTED = '2d0dca532e7191feb1d07b9bdf58554be3a1c2cb50892c4cfd275601576c2491'
 
 def main():
     if not PACK.is_file():

@@ -39,6 +39,45 @@ class PlayStoreAssets(private val runner: Instrumentation) {
         (if (view is TextView) listOf(view) else emptyList()) +
         (if (view is ViewGroup) (0 until view.childCount).flatMap { texts(view.getChildAt(it)) } else emptyList())
 
+    private fun showcase(at: Long) {
+        val image = Bitmap.createBitmap(1080, 1920, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(image)
+        canvas.drawColor(Color.rgb(221, 229, 230))
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        data class Example(val name: String, val country: String, val continent: String, val countryName: String, val theme: Int)
+        val locations = listOf(
+            Example("Oslo", "NO", "EUROPE", "Norway", 1),
+            Example("San Diego", "US", "NORTH AMERICA", "USA", 0),
+            Example("Rio de Janeiro", "BR", "SOUTH AMERICA", "Brazil", 1),
+            Example("Cape Town", "ZA", "AFRICA", "South Africa", 2),
+            Example("Singapore", "SG", "ASIA", "Singapore", 1),
+            Example("Perth", "AU", "OCEANIA", "Australia", 2))
+        val evidence = StringBuilder("Native ChartRenderer widgets, real EOT20 forecasts at $at UTC milliseconds. One example per inhabited continent; Antarctica is outside tide coverage.\n")
+        for ((index, example) in locations.withIndex()) {
+            val x = if (index % 2 == 0) 48f else 560f
+            val top = 136f + (index / 2) * 600f
+            val box = RectF(x, top, x + 472f, top + 472f)
+            val place = CoastalPlaces.search(context, example.name).first { it.country == example.country }
+            val settings = WidgetSettings(followCurrent = false, latitude = place.latitude, longitude = place.longitude,
+                place = example.name, showLocationName = true, labelScale = 1.2f).apply { theme(example.theme) }
+            if (index == 2) settings.background = 0xff164c58.toInt()
+            if (index == 3) { settings.foreground = 0xff203b42.toInt(); settings.curve = settings.foreground }
+            if (index == 4) settings.background = 0xff443756.toInt()
+            if (index == 5) { settings.background = 0xffe5dcc5.toInt(); settings.foreground = 0xff344d46.toInt(); settings.curve = settings.foreground }
+            val tide = TideRepository.snapshot(context, settings, at)
+            check(tide.signal != null) { "Store example unavailable: ${example.name}, ${tide.error}" }
+            canvas.save()
+            canvas.clipPath(android.graphics.Path().apply { addRoundRect(box, 26f, 26f, android.graphics.Path.Direction.CW) })
+            val graph = ChartRenderer.bitmap(context, 180, 180, settings, tide)
+            canvas.drawBitmap(graph, null, box, null)
+            canvas.restore()
+            evidence.append("${example.continent}: ${example.name} (${example.country}): ${place.latitude},${place.longitude}; theme=${example.theme}; ${settings.hours}h; current=${tide.currentMetres}; native ${graph.width}x${graph.height}.\n")
+        }
+        save("phoneScreenshots/00-widget-styles.png", image)
+        File(output, "showcase-provenance.txt").writeText(evidence.toString() +
+            "1080x1920 plain home-screen-style arrangement of unmodified native widget renders on a single plain background. Only in-widget time/height/location labels; no marketing text, external captions, status bar or invented launcher UI. No personal device or launcher content. Europe/Oslo process clock for all examples; forecast times follow the phone setting, not the place's time zone.\n")
+    }
+
     fun export() {
         check(context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0)
         output.mkdirs()
@@ -54,6 +93,7 @@ class PlayStoreAssets(private val runner: Instrumentation) {
         TimeZone.setDefault(TimeZone.getTimeZone("Europe/Oslo")) // App process only; never changes phone settings.
         try {
             val at = Instant.parse("2026-10-30T12:00:00Z").toEpochMilli()
+            showcase(Instant.parse("2026-11-26T11:00:00Z").toEpochMilli())
             val snapshot = TideRepository.snapshot(context, settings, at)
             check(snapshot.signal != null) { "Real model data is required for store artwork" }
             val icon = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888)

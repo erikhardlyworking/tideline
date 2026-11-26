@@ -58,6 +58,8 @@ class ModelPack(private val source: DataSource) : Closeable {
     val rows: Int
     val cols: Int
     val step: Double
+    val minimumTideLatitude get() = header["coverage_south"]?.jsonPrimitive?.double ?: -90.0
+    val maximumTideLatitude get() = header["coverage_north"]?.jsonPrimitive?.double ?: 90.0
     val astronomy: Astronomy by lazy { Astronomy(header.getValue("astronomy").jsonObject, block("astronomy")) }
     val water: WaterAtlas by lazy { WaterAtlas(this) }
 

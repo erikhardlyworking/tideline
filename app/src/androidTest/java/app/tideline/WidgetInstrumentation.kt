@@ -81,13 +81,16 @@ class WidgetInstrumentation : Instrumentation() {
             check(SettingsStore(defaultsContext).get(0).hours == 6) { "Default migration repeated over a later choice" }
             oldDefaults.edit().clear().commit()
             check(WidgetSettings.fromJson(settings.copy(lineWidth = 1.6f).toJson()).lineWidth == 1.6f)
-            val old = settings.copy(followCurrent = true, backgroundFollow = true)
+            val old = settings.copy(followCurrent = true, backgroundFollow = true, currentPlace = "My coast", showLocationName = true)
             store.put(99992, old)
             val fix = android.location.Location("network").apply { latitude = 59.0; longitude = 8.0; time = System.currentTimeMillis(); accuracy = 2500f }
             BackgroundLocation.storeFix(context, intArrayOf(99991,99992), fix)
             check(store.get(99991).latitude == settings.latitude && store.get(99992).latitude == 59.0)
+            check(store.get(99992).currentPlace == "My coast" && store.get(99992).place == "Tregde") { "A location fix erased a chosen name" }
             store.put(99992, old.copy(hours = 24))
             check(store.get(99992).latitude == 59.0) { "An appearance edit replaced the newer background fix" }
+            store.put(99992, old.copy(currentPlace = "Renamed coast"))
+            check(store.get(99992).currentPlace == "Renamed coast" && store.get(99992).latitude == 59.0) { "Merging a newer fix erased the edited name" }
             store.update(99992) { it.backgroundFollow = false }
             BackgroundLocation.storeFix(context, intArrayOf(99992), android.location.Location(fix).apply { latitude = 60.0; time += 1000 })
             check(store.get(99992).latitude == 59.0) { "Disabled following accepted a new fix" }
@@ -105,6 +108,31 @@ class WidgetInstrumentation : Instrumentation() {
             val inland = TideRepository.snapshot(context, settings.copy(latitude = 52.52, longitude = 13.405), now)
             check(inland.signal == null && inland.coverageProblem == app.tideline.core.LocationProblem.TOO_FAR_FROM_COAST)
             val outputDirectory = File(context.filesDir, "device-checks").apply { mkdirs() }
+            val oslo = CoastalPlaces.search(context, "Oslo").first()
+            check(oslo.name == "Oslo" && oslo.country == "NO" && oslo.region.isNotBlank())
+            check(TideRepository.snapshot(context, settings.copy(latitude = oslo.latitude, longitude = oslo.longitude), now).signal != null) { "Oslo search result has no usable tide support" }
+            for ((name, lat, lon) in listOf(Triple("Hammerfest", 70.6634, 23.6821), Triple("Nordkapp", 71.1725, 25.7844), Triple("Cape Horn", -55.98, -67.29))) {
+                val retained = TideRepository.snapshot(context, settings.copy(latitude = lat, longitude = lon), now)
+                check(retained.signal != null) { "Polar trim removed $name: ${retained.error}" }
+            }
+            for ((lat, lon) in listOf(78.223 to 15.646, -67.0 to -66.0)) {
+                val polar = TideRepository.snapshot(context, settings.copy(latitude = lat, longitude = lon), now)
+                check(polar.signal == null && polar.coverageProblem == app.tideline.core.LocationProblem.NO_COVERAGE)
+            }
+            for ((name, point) in listOf("oslo" to app.tideline.core.GeoPoint(oslo.latitude, oslo.longitude), "horn" to app.tideline.core.GeoPoint(-55.98, -67.29), "dateline" to app.tideline.core.GeoPoint(0.0, 180.0), "polar" to app.tideline.core.GeoPoint(90.0, 0.0))) {
+                val globe = GlobeRenderer.bitmap(context, point)
+                check(Color.alpha(globe.getPixel(0, 0)) == 0)
+                check(globe.getPixel(globe.width / 2, globe.height / 2) == 0xffc8483b.toInt())
+                FileOutputStream(File(outputDirectory, "globe-$name.png")).use { globe.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            }
+            check(CoastalPlaces.search(context, "Ålesund").first().id == CoastalPlaces.search(context, "Alesund").first().id)
+            check(CoastalPlaces.search(context, "Brest").map { it.country }.distinct().isNotEmpty())
+            check(CoastalPlaces.search(context, "zznonexistentcoastzz").isEmpty())
+            check(CoastalPlaces.search(context, "[").isEmpty())
+            check(CoastalPlaces.search(context, "Os").size <= 20)
+            val migrated = WidgetSettings.fromJson("{\"follow\":false,\"lat\":59.9,\"lon\":10.7,\"place\":\"Oslo\"}")
+            check(!migrated.showLocationName && migrated.currentPlace == "Current" && migrated.fixedLatitude == 59.9 && migrated.fixedLongitude == 10.7)
+            check(WidgetSettings.fromJson(migrated.copy(currentPlace = "Home coast", showLocationName = true).toJson()).currentPlace == "Home coast")
             val inlandImage = ChartRenderer.bitmap(context, 320, 142, settings, inland)
             FileOutputStream(File(outputDirectory, "inland.png")).use { inlandImage.compress(Bitmap.CompressFormat.PNG, 100, it) }
             val auditLog = StringBuilder()
@@ -115,6 +143,9 @@ class WidgetInstrumentation : Instrumentation() {
                 check(update.size == 1 && update[0].text.startsWith(PhoneFormats.time(context, tide.startMillis))) { "Update timestamp missing at ${width}x$height, scale ${style.labelScale}" }
                 check(kotlin.math.abs(update[0].bounds.centerX() - bitmap.width / 2f) < .2f) { "Timestamp is not centred" }
                 val visible = tide.samples(style.hours, (width * 2).coerceIn(100, 1000))!!
+                check(audit.textHaloAlpha in 100..180) { "Text outlines must remain translucent" }
+                if (audit.heightMarks.size == 1) for (mark in audit.heightMarks) check(kotlin.math.abs(mark.y - mark.labelSignY) < .2f) { "One-sided height sign is not aligned with its guide at ${width}x$height" }
+                for (label in audit.labels) check(label.bounds.top >= -.2f && label.bounds.bottom <= bitmap.height + .2f && label.bounds.left >= -.2f && label.bounds.right <= bitmap.width + .2f) { "Label outside image: $label" }
                 check(audit.labels.any { it.kind == "minimum" } == visible.any { it < 0 })
                 check(audit.labels.any { it.kind == "maximum" } == (visible.any { it > 0 } || visible.all { it == 0.0 }))
                 val quarter = audit.ticks.filter { it.minute == 15 || it.minute == 45 }
@@ -169,7 +200,14 @@ class WidgetInstrumentation : Instrumentation() {
                 val oneSided = dayWindows.first { it.samples(2, 640)!!.all(predicate) }
                 val image = checkedRender(settings.copy(hours = 2), 320, 142, oneSided)
                 FileOutputStream(File(outputDirectory, "$name.png")).use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                for ((w,h) in listOf(130 to 64, 180 to 180, 320 to 142)) {
+                    val named = checkedRender(settings.copy(hours = 2, showLocationName = true, place = "A very long coastal location name that must fit"), w, h, oneSided)
+                    FileOutputStream(File(outputDirectory, "$name-named-$w.png")).use { named.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                }
             }
+            val namedAudit = ChartAudit()
+            ChartRenderer.bitmap(context, 320, 142, settings.copy(showLocationName = true, place = "Oslo"), snapshot, audit = namedAudit)
+            check(namedAudit.labels.single { it.kind == "asof" }.text.endsWith("Oslo"))
             val offset = TideRepository.snapshot(context, settings.copy(latitude = 58.15, longitude = 7.55), now)
             check(offset.signal != null && offset.nearestCellDistanceKm!! in 0.0..30.0) { "30 km location policy failed: ${offset.error}, ${offset.nearestCellDistanceKm}" }
             check(inland.nearestCellDistanceKm!! > 30.0 && inland.error == "Too far from coast")
@@ -222,6 +260,7 @@ class WidgetInstrumentation : Instrumentation() {
                 val rectangle = android.graphics.Rect(); field.getDrawingRect(rectangle)
                 content.offsetDescendantRectToMyCoords(field, rectangle); content.scrollTo(0, rectangle.top)
                 activity.findViewById<android.widget.RadioButton>(R.id.location_mode_fixed).isChecked = true
+                activity.findViewById<Button>(R.id.coordinate_toggle).performClick()
                 activity.findViewById<android.widget.EditText>(R.id.fixed_latitude).setText("58.006377")
                 activity.findViewById<android.widget.EditText>(R.id.fixed_longitude).setText("7.554759")
                 activity.findViewById<android.widget.EditText>(R.id.fixed_location_name).setText("Fixed beach")
@@ -230,6 +269,41 @@ class WidgetInstrumentation : Instrumentation() {
             check(!store.get(99991).followCurrent && store.get(99991).place == "Fixed beach")
             check(kotlin.math.abs(store.get(99991).latitude - 58.006377) < 1e-9)
             check(kotlin.math.abs(store.get(99991).longitude - 7.554759) < 1e-9)
+            if (android.os.Build.VERSION.SDK_INT >= 29) {
+                onUi { activity.findViewById<Button>(R.id.search_location).performClick() }
+                waitForIdleSync()
+                onUi {
+                    android.view.inspector.WindowInspector.getGlobalWindowViews().mapNotNull { it.findViewById<android.widget.EditText>(R.id.place_search_query) }.single().setText("Oslo")
+                }
+                val searchDeadline = System.currentTimeMillis() + 10_000
+                var loaded = false
+                while (System.currentTimeMillis() < searchDeadline && !loaded) {
+                    onUi { loaded = android.view.inspector.WindowInspector.getGlobalWindowViews().mapNotNull { it.findViewById<android.widget.ListView>(R.id.place_search_results) }.single().adapter?.count?.let { it > 0 } == true }
+                    if (!loaded) Thread.sleep(100)
+                }
+                check(loaded) { "Offline search dialog did not show Oslo" }
+                onUi {
+                    val list = android.view.inspector.WindowInspector.getGlobalWindowViews().mapNotNull { it.findViewById<android.widget.ListView>(R.id.place_search_results) }.single()
+                    list.performItemClick(list.getChildAt(0), 0, list.adapter.getItemId(0))
+                    activity.findViewById<android.widget.Switch>(R.id.show_location_name).isChecked = true
+                }
+                check(store.get(99991).place == "Oslo" && store.get(99991).showLocationName)
+                check(kotlin.math.abs(store.get(99991).latitude - oslo.latitude) < 1e-9)
+                onUi {
+                    activity.findViewById<android.widget.EditText>(R.id.fixed_location_name).setText("Oslo home")
+                    activity.findViewById<android.widget.RadioButton>(R.id.location_mode_current).isChecked = true
+                }
+                // Cancel any permission prompt immediately; this test never grants
+                // or supplies the phone's real location to either app copy.
+                uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
+                waitForIdleSync()
+                onUi {
+                    activity.findViewById<android.widget.EditText>(R.id.fixed_location_name).setText("Travelling")
+                    activity.findViewById<android.widget.RadioButton>(R.id.location_mode_fixed).isChecked = true
+                }
+                check(store.get(99991).place == "Oslo home" && store.get(99991).currentPlace == "Travelling")
+                check(kotlin.math.abs(store.get(99991).latitude - oslo.latitude) < 1e-9) { "Switching modes lost the fixed location" }
+            }
             val tapMonitor = addMonitor(MainActivity::class.java.name, null, false)
             val idsBeforeEditing = WidgetUpdates.ids(context).sorted()
             val otherWidgetBeforeEditing = store.get(99992).toJson()
@@ -265,7 +339,7 @@ class WidgetInstrumentation : Instrumentation() {
                 }
                 waitForIdleSync()
             }
-            output.putString("result", "30 km coverage and displayed distances, centred timestamps, one-sided heights, quarter/half/hour ticks, phone time/date formats, widget/configure/launcher modes; real offline EOT20 predictions, inland detection, opt-in location fix filtering and edit races, 4-hour forecasts, 2×2 widget defaults, persisted appearance, 60 audited real-data renders with non-overlapping timestamps and height labels, unobstructed level guides, fixed-location saving, accuracy note, single-line buttons, RemoteViews and widget tap saving only its own settings without adding another widget passed")
+            output.putString("result", "Offline coastal search, Oslo model coverage, accent aliases, search dialog selection, named current/fixed modes, name/fix merge races, optional ellipsized footer names, aligned minimum/maximum signs, translucent halos and continuous curves, 66 audited native renders, offline globe projections at Oslo/Cape Horn/dateline/pole, polar exclusion and Hammerfest/Nordkapp/Cape Horn retention; existing coverage, tick, activity, widget editing and 2×2 default regressions passed")
         } catch (error: Throwable) {
             output.putString("failure", error.stackTraceToString())
             outcome = Activity.RESULT_CANCELED

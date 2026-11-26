@@ -5,7 +5,18 @@
     <string name="location">Location</string>
     <string name="set_location">Set location</string>
     <string name="specific_location">Specific location</string>
-    <string name="fixed_location_help">Enter coastal latitude and longitude, with an optional name. This location stays fixed as you move.</string>
+    <string name="fixed_location_help">Search for a coastal town or enter coordinates. This location stays fixed as you move.</string>
+    <string name="search_location">Search coastal places</string>
+    <string name="place_search_hint">Town or city, e.g. Oslo</string>
+    <string name="place_search_help">Offline search of towns near coastal tide data. For a beach or a place not listed, use coordinates.</string>
+    <string name="place_search_start">Enter at least two letters.</string>
+    <string name="place_search_empty">No matching coastal town. Try another name or use coordinates.</string>
+    <string name="place_search_failed">Place search is unavailable. You can still enter coordinates.</string>
+    <string name="place_search_count">%1$d matches shown. Select a place to use it.</string>
+    <string name="enter_coordinates">Enter coordinates</string>
+    <string name="show_location_name">Show location name on widget</string>
+    <string name="location_name_help">Applies to this widget. Long names are shortened to fit the last line.</string>
+    <string name="globe_description">Globe centred on %1$s. The red point marks the selected location.</string>
     <string name="accuracy_note" formatted="false">Approximate tides. At tested sites, median RMS error was 5.3% of tidal range (6.5 cm). Local errors can be much larger. Weather effects are excluded.</string>
     <string name="use_current_location">Use current location</string>
     <string name="use_my_location">Use my location</string>
@@ -39,7 +50,7 @@
     <string name="refresh">Refresh</string>
     <string name="now">Now</string>
     <string name="current_height">Now: %1$s</string>
-    <string name="height_at_update">%1$s · %2$s</string>
+    <string name="height_at_update">%1$s: %2$s</string>
     <string name="rising">Rising</string>
     <string name="falling">Falling</string>
     <string name="turning">Near a turning point</string>
@@ -84,8 +95,8 @@
     <string name="widget_number">widget %1$d</string>
     <string name="height_cm">%1$+d cm</string>
     <string name="about_data">About the data</string>
-    <string name="about_body">Offline EOT20 ocean tide data, with all 17 constituents. Original harmonic values are stored losslessly. Astronomy tables support 2020–2040. Coastal gaps and small harbours can be unsupported; the Caspian has no EOT20 data. No accounts, advertising, tracking or forecast requests.</string>
-    <string name="attribution">Contains EOT20 data by Hart-Davis and colleagues (2021), CC BY 4.0. Coastal subsetting and format conversion. Shoreline: Natural Earth, public domain. Astronomical basis: pyTMD 2.2.9, MIT.</string>
+    <string name="about_body">Offline EOT20 ocean tide data, with all 17 constituents. Original harmonic values are stored losslessly. Astronomy tables support 2020–2040. Coverage runs from 60°S to 72°N, including mainland northern Norway and Cape Horn; polar regions are excluded. Coastal gaps and small harbours can be unsupported; the Caspian has no EOT20 data. No accounts, advertising, tracking or forecast requests.</string>
+    <string name="attribution">Contains EOT20 data by Hart-Davis and colleagues (2021), CC BY 4.0. Coastal subsetting and format conversion. Places: GeoNames, CC BY 4.0. Shoreline: Natural Earth, public domain. Astronomical basis: pyTMD 2.2.9, MIT.</string>
     <string name="licences">Data and software notices</string>
     <string name="cancel">Cancel</string>
     <string name="save">Save</string>
