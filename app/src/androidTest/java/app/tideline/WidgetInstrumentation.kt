@@ -81,16 +81,16 @@ class WidgetInstrumentation : Instrumentation() {
             check(SettingsStore(defaultsContext).get(0).hours == 6) { "Default migration repeated over a later choice" }
             oldDefaults.edit().clear().commit()
             check(WidgetSettings.fromJson(settings.copy(lineWidth = 1.6f).toJson()).lineWidth == 1.6f)
-            val old = settings.copy(followCurrent = true, backgroundFollow = true, currentPlace = "My coast", showLocationName = true)
+            val old = settings.copy(followCurrent = true, backgroundFollow = true, showLocationName = true)
             store.put(99992, old)
             val fix = android.location.Location("network").apply { latitude = 59.0; longitude = 8.0; time = System.currentTimeMillis(); accuracy = 2500f }
             BackgroundLocation.storeFix(context, intArrayOf(99991,99992), fix)
             check(store.get(99991).latitude == settings.latitude && store.get(99992).latitude == 59.0)
-            check(store.get(99992).currentPlace == "My coast" && store.get(99992).place == "Tregde") { "A location fix erased a chosen name" }
+            check(store.get(99992).locationName() == "Current" && store.get(99992).place == "Tregde") { "A location fix erased a chosen name" }
             store.put(99992, old.copy(hours = 24))
             check(store.get(99992).latitude == 59.0) { "An appearance edit replaced the newer background fix" }
-            store.put(99992, old.copy(currentPlace = "Renamed coast"))
-            check(store.get(99992).currentPlace == "Renamed coast" && store.get(99992).latitude == 59.0) { "Merging a newer fix erased the edited name" }
+            store.put(99992, old.copy(place = "Renamed fixed coast"))
+            check(store.get(99992).place == "Renamed fixed coast" && store.get(99992).latitude == 59.0) { "Merging a newer fix erased the edited name" }
             store.update(99992) { it.backgroundFollow = false }
             BackgroundLocation.storeFix(context, intArrayOf(99992), android.location.Location(fix).apply { latitude = 60.0; time += 1000 })
             check(store.get(99992).latitude == 59.0) { "Disabled following accepted a new fix" }
@@ -131,8 +131,8 @@ class WidgetInstrumentation : Instrumentation() {
             check(CoastalPlaces.search(context, "[").isEmpty())
             check(CoastalPlaces.search(context, "Os").size <= 20)
             val migrated = WidgetSettings.fromJson("{\"follow\":false,\"lat\":59.9,\"lon\":10.7,\"place\":\"Oslo\"}")
-            check(!migrated.showLocationName && migrated.currentPlace == "Current" && migrated.fixedLatitude == 59.9 && migrated.fixedLongitude == 10.7)
-            check(WidgetSettings.fromJson(migrated.copy(currentPlace = "Home coast", showLocationName = true).toJson()).currentPlace == "Home coast")
+            check(!migrated.showLocationName && migrated.copy(followCurrent = true).locationName() == "Current" && migrated.fixedLatitude == 59.9 && migrated.fixedLongitude == 10.7)
+            check(WidgetSettings.fromJson("{\"follow\":true,\"currentPlace\":\"Old custom name\"}").locationName() == "Current")
             val inlandImage = ChartRenderer.bitmap(context, 320, 142, settings, inland)
             FileOutputStream(File(outputDirectory, "inland.png")).use { inlandImage.compress(Bitmap.CompressFormat.PNG, 100, it) }
             val auditLog = StringBuilder()
@@ -162,7 +162,7 @@ class WidgetInstrumentation : Instrumentation() {
                     if (guide.y >= label.bounds.top && guide.y <= label.bounds.bottom)
                         check(guide.right <= label.bounds.left || guide.left >= label.bounds.right) { "Guide crosses height value" }
                 }
-                auditLog.append("${width}x$height · ${style.labelScale} · ${tide.startMillis}: ${audit.labels}\n")
+                auditLog.append("${width}x$height · ${style.labelScale} · ${tide.startMillis}: footer gap ${audit.footerGapBefore} -> ${audit.footerGapAfter}; ${audit.labels}\n")
                 return bitmap
             }
             for (theme in 0..2) {
@@ -298,11 +298,63 @@ class WidgetInstrumentation : Instrumentation() {
                 uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
                 waitForIdleSync()
                 onUi {
-                    activity.findViewById<android.widget.EditText>(R.id.fixed_location_name).setText("Travelling")
+                    check(activity.findViewById<android.widget.EditText>(R.id.fixed_location_name).visibility == View.GONE)
                     activity.findViewById<android.widget.RadioButton>(R.id.location_mode_fixed).isChecked = true
                 }
-                check(store.get(99991).place == "Oslo home" && store.get(99991).currentPlace == "Travelling")
+                check(store.get(99991).place == "Oslo home" && store.get(99991).copy(followCurrent = true).locationName() == "Current")
                 check(kotlin.math.abs(store.get(99991).latitude - oslo.latitude) < 1e-9) { "Switching modes lost the fixed location" }
+            }
+            // Inject public demonstration fixes into this activity's request
+            // boundary; never mock the phone provider or read its real position.
+            val callbacks = mutableListOf<(android.location.Location?) -> Unit>()
+            val fakeAccess = object : LocationAccess(activity) {
+                override fun permitted() = true
+                override fun request(callback: (android.location.Location?) -> Unit) { callbacks += callback }
+            }
+            val otherBeforeCapture = store.get(99992).toJson()
+            val capturedFix = android.location.Location("network").apply {
+                latitude = 58.006377; longitude = 7.554759; time = System.currentTimeMillis(); accuracy = 2000f
+            }
+            onUi {
+                MainActivity::class.java.getDeclaredField("access").apply { isAccessible = true }.set(activity, fakeAccess)
+                activity.findViewById<android.widget.RadioButton>(R.id.location_mode_current).isChecked = true
+                check(activity.findViewById<View>(R.id.fixed_location_name).visibility == View.GONE)
+                val staleMovingFix = callbacks.last()
+                activity.findViewById<Button>(R.id.capture_my_location).performClick()
+                check(activity.findViewById<android.widget.RadioButton>(R.id.location_mode_fixed).isChecked)
+                check(!store.get(99991).followCurrent)
+                staleMovingFix(android.location.Location(capturedFix).apply { latitude = 60.0 })
+                check(store.get(99991).latitude != 60.0) { "Late following fix replaced a fixed point" }
+                callbacks.last()(capturedFix)
+                val name = activity.findViewById<android.widget.EditText>(R.id.fixed_location_name)
+                check(name.isFocused && name.text.isEmpty()) { "Captured point did not focus a blank fixed-location name" }
+                name.setText("Captured beach")
+            }
+            val captured = store.get(99991)
+            check(!captured.followCurrent && captured.fixedLatitude == capturedFix.latitude && captured.fixedLongitude == capturedFix.longitude)
+            check(captured.latitude == capturedFix.latitude && captured.longitude == capturedFix.longitude && captured.place == "Captured beach")
+            check(store.get(99992).toJson() == otherBeforeCapture) { "One-off location capture updated another widget" }
+            onUi {
+                activity.findViewById<Button>(R.id.capture_my_location).performClick()
+                val staleCapture = callbacks.last()
+                activity.findViewById<android.widget.EditText>(R.id.fixed_latitude).setText("59.912730")
+                activity.findViewById<android.widget.EditText>(R.id.fixed_longitude).setText("10.746090")
+                activity.findViewById<Button>(R.id.save_fixed_location).performClick()
+                staleCapture(capturedFix)
+                check(store.get(99991).latitude == 59.912730) { "Late captured fix overwrote manually entered coordinates" }
+                activity.findViewById<Button>(R.id.capture_my_location).performClick()
+                activity.findViewById<android.widget.EditText>(R.id.fixed_location_name).setText("Named while finding")
+                callbacks.last()(capturedFix)
+                check(store.get(99991).place == "Named while finding") { "Capturing erased the newly entered name" }
+                activity.findViewById<Button>(R.id.capture_my_location).performClick()
+                callbacks.last()(null)
+                check(store.get(99991).place == "Named while finding" && store.get(99991).latitude == capturedFix.latitude)
+                // Android permission callbacks must resume the fixed capture,
+                // without switching to following. No OS permission is granted.
+                MainActivity::class.java.getDeclaredField("pendingFixedLocation").apply { isAccessible = true }.setBoolean(activity, true)
+                activity.onRequestPermissionsResult(21, arrayOf(android.Manifest.permission.ACCESS_COARSE_LOCATION), intArrayOf(PackageManager.PERMISSION_GRANTED))
+                callbacks.last()(capturedFix)
+                check(!store.get(99991).followCurrent && store.get(99991).fixedLatitude == capturedFix.latitude)
             }
             val tapMonitor = addMonitor(MainActivity::class.java.name, null, false)
             val idsBeforeEditing = WidgetUpdates.ids(context).sorted()
@@ -339,7 +391,7 @@ class WidgetInstrumentation : Instrumentation() {
                 }
                 waitForIdleSync()
             }
-            output.putString("result", "Offline coastal search, Oslo model coverage, accent aliases, search dialog selection, named current/fixed modes, name/fix merge races, optional ellipsized footer names, aligned minimum/maximum signs, translucent halos and continuous curves, 66 audited native renders, offline globe projections at Oslo/Cape Horn/dateline/pole, polar exclusion and Hammerfest/Nordkapp/Cape Horn retention; existing coverage, tick, activity, widget editing and 2×2 default regressions passed")
+            output.putString("result", "One-off Use my location remains fixed, focuses the name, preserves other widgets, handles delayed fixes/manual edits/failure/permission callback; Current name is fixed with no editable field. Reduced footer gap and 66 audited native renders passed, plus coastal search, globe, polar coverage, widget editing and existing regressions.")
         } catch (error: Throwable) {
             output.putString("failure", error.stackTraceToString())
             outcome = Activity.RESULT_CANCELED

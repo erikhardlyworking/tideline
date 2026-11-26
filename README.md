@@ -6,7 +6,7 @@ An offline Android home-screen tide widget. A white tide curve runs around a cen
 - New widgets start at 2×2 cells and can be resized.
 - Whole-hour labels, quarter-hour ticks and larger half-hour ticks in shorter views; the centred timestamp identifies the last calculation.
 - Offline search of about 40,000 coastal towns, fixed coordinates or approximate current location, with optional background following.
-- Name either location mode and optionally show its name beside the update time. A small offline globe shows the selected point in settings.
+- Optionally show a fixed-location name or Current beside the update time. A small offline globe shows the selected point in settings.
 - Adjustable colours, transparency, label size, line thickness and padding. Launcher-controlled corners and zero vertical padding by default.
 - All 17 EOT20 constituents calculated locally. No Internet permission, accounts, advertising or analytics.
 
@@ -22,7 +22,7 @@ Polar tide cells are omitted: latitude coverage is **60°S–72°N**, retaining 
 
 ## Use
 
-Open TideLine and find the **Location** section below Tide details. Choose **Current location** or **Specific location**. Search coastal towns by name and select a result showing its region and country, or open **Enter coordinates** for an exact point. The globe centres on the selected point. Both modes have editable names (default **Current** when following); **Show location name on widget** adds the name in bold beside the update time/height. Long names are shortened to fit. Search and the globe work offline without location permission. Add the widget through the app or the launcher's widget picker. Each widget retains its own location, forecast duration and appearance. Tapping a widget opens its own settings; **Save widget** applies the settings and closes the screen.
+Open TideLine and find the **Location** section below Tide details. Choose **Current location** or **Specific location**. Search coastal towns by name and select a result showing its region and country, or open **Enter coordinates** for an exact point. The globe centres on the selected point. Moving locations use the fixed label **Current**. Specific locations can have an editable name; **Use my location** saves your current position as a fixed point and focuses its name field. **Show location name on widget** adds the name in bold beside the update time/height. Long names are shortened to fit. Search and the globe work offline without location permission. Add the widget through the app or the launcher's widget picker. Each widget retains its own location, forecast duration and appearance. Tapping a widget opens its own settings; **Save widget** applies the settings and closes the screen.
 
 The widget refreshes approximately every 15 minutes; Android can delay updates during sleep or battery saving. It is not a live clock. The centred time and height identify its last calculation. Open the app or tap **Refresh** for an immediate calculation.
 

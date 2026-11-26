@@ -18,6 +18,8 @@ class ChartAudit {
     data class HeightMark(val y: Float, val labelSignY: Float)
     val heightMarks = mutableListOf<HeightMark>()
     var textHaloAlpha = 0
+    var footerGapBefore = 0f
+    var footerGapAfter = 0f
 }
 
 object ChartRenderer {
@@ -80,7 +82,7 @@ object ChartRenderer {
             else ""
         val nameWidth = if (locationName.isEmpty()) 0f else nameGap + paint.measureText(locationName)
         paint.typeface = normal
-        val nowBaseline = height - verticalPadding - paint.descent()
+        var nowBaseline = height - verticalPadding - paint.descent()
         val nowLeft = (width - nowWidth - nameWidth) / 2
         val nowRect = RectF(nowLeft, nowBaseline + paint.ascent(), nowLeft + nowWidth + nameWidth, nowBaseline + paint.descent())
 
@@ -110,6 +112,15 @@ object ChartRenderer {
         val levelRects = levelTexts.indices.map { i ->
             RectF(labelRight - paint.measureText(levelTexts[i]), levelBaselines[i] + paint.ascent(), labelRight, levelBaselines[i] + paint.descent())
         }
+        // Halve the free gap below the lower height label/hour-label band.
+        // Keep the tide scale and zero axis fixed so height marks stay aligned.
+        val hourBandBottom = axis + 8 * tickScale + 3 * dp + (paint.descent() - paint.ascent()) * .87f
+        val lowerContent = max(hourBandBottom, levelRects.maxOf { it.bottom })
+        val footerGap = max(0f, nowRect.top - lowerContent)
+        nowBaseline -= footerGap / 2
+        nowRect.offset(0f, -footerGap / 2)
+        audit?.footerGapBefore = footerGap
+        audit?.footerGapAfter = footerGap / 2
         val blocked = (levelRects + nowRect).map { RectF(it).apply { inset(-3 * dp, -2 * dp) } }
         val zone = ZoneId.systemDefault()
         val ticks = ForecastTimeline.ticks(tide.startMillis, hours, zone)

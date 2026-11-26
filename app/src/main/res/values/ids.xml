@@ -16,4 +16,5 @@
     <item name="place_search_results" type="id" />
     <item name="coordinate_toggle" type="id" />
     <item name="location_globe" type="id" />
+    <item name="capture_my_location" type="id" />
 </resources>

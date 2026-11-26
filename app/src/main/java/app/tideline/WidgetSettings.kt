@@ -10,7 +10,6 @@ data class WidgetSettings(
     var latitude: Double = Double.NaN,
     var longitude: Double = Double.NaN,
     var place: String = "",
-    var currentPlace: String = "Current",
     var showLocationName: Boolean = false,
     var fixedLatitude: Double = Double.NaN,
     var fixedLongitude: Double = Double.NaN,
@@ -27,7 +26,7 @@ data class WidgetSettings(
     var guides: Boolean = false
 ) {
     fun point(): GeoPoint? = if (latitude.isFinite() && longitude.isFinite() && latitude in -90.0..90.0 && longitude in -180.0..180.0) GeoPoint(latitude, longitude) else null
-    fun locationName(): String = if (followCurrent) currentPlace.ifBlank { "Current" } else place
+    fun locationName(): String = if (followCurrent) "Current" else place
     fun label(): String = locationName().ifBlank { point()?.let { String.format(java.util.Locale.getDefault(), "%.3f°, %.3f°", it.latitude, it.longitude) } ?: "" }
     fun theme(index: Int) {
         when (index) {
@@ -40,7 +39,7 @@ data class WidgetSettings(
     fun toJson(): String = JSONObject().apply {
         put("follow", followCurrent); put("backgroundFollow", backgroundFollow); if (point() != null) { put("lat", latitude); put("lon", longitude) }
         put("place", place); put("locationAt", locationAt); put("accuracy", accuracy); put("hours", hours)
-        put("currentPlace", currentPlace); put("showLocationName", showLocationName)
+        put("showLocationName", showLocationName)
         if (fixedLatitude.isFinite() && fixedLongitude.isFinite()) { put("fixedLat", fixedLatitude); put("fixedLon", fixedLongitude) }
         put("appearanceVersion", 2)
         put("background", background); put("foreground", foreground); put("curve", curve)
@@ -56,7 +55,6 @@ data class WidgetSettings(
                 s.followCurrent = o.optBoolean("follow", true); s.latitude = o.optDouble("lat", Double.NaN); s.longitude = o.optDouble("lon", Double.NaN)
                 s.backgroundFollow = o.optBoolean("backgroundFollow", false)
                 s.place = o.optString("place", ""); s.locationAt = o.optLong("locationAt", 0); s.accuracy = o.optDouble("accuracy", 0.0).toFloat().coerceAtLeast(0f)
-                s.currentPlace = o.optString("currentPlace", "Current").ifBlank { "Current" }
                 s.showLocationName = o.optBoolean("showLocationName", false)
                 s.fixedLatitude = o.optDouble("fixedLat", if (!s.followCurrent) s.latitude else Double.NaN)
                 s.fixedLongitude = o.optDouble("fixedLon", if (!s.followCurrent) s.longitude else Double.NaN)

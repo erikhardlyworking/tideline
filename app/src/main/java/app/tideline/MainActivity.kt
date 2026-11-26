@@ -40,6 +40,8 @@ class MainActivity : Activity() {
     private var configuring = false
     private var stopped = false
     private var locating = false
+    private var pendingFixedLocation = false
+    private var locationGeneration = 0
     private var continueBackgroundPermission = false
     private lateinit var backgroundStatus: TextView
     private var requestGeneration = 0
@@ -76,7 +78,7 @@ class MainActivity : Activity() {
         }
         handler.removeCallbacks(minuteTick); handler.postDelayed(minuteTick, 60_000)
     }
-    override fun onStop() { stopped = true; locating = false; handler.removeCallbacks(minuteTick); access.cancel(); super.onStop() }
+    override fun onStop() { stopped = true; cancelActiveLocation(); handler.removeCallbacks(minuteTick); super.onStop() }
     override fun onDestroy() { executor.shutdownNow(); super.onDestroy() }
 
     private fun text(value: String, size: Float = 15f, colour: Int = ink, bold: Boolean = false): TextView = TextView(this).apply {
@@ -139,7 +141,7 @@ class MainActivity : Activity() {
             spinner.setSelection(choices.indexOf(widgetId).coerceAtLeast(0))
             spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
                 override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                    if (choices[position] != widgetId) { widgetId = choices[position]; settings = store.get(widgetId); snapshot = null; buildScreen(); recalculate() }
+                    if (choices[position] != widgetId) { pendingFixedLocation = false; cancelActiveLocation(); widgetId = choices[position]; settings = store.get(widgetId); snapshot = null; buildScreen(); recalculate() }
                 }
                 override fun onNothingSelected(parent: AdapterView<*>?) {}
             }
@@ -180,11 +182,11 @@ class MainActivity : Activity() {
         location.addView(modes)
         locationStatus = text("", 12f, muted); location.addView(locationStatus)
         var changingName = false
-        val name = EditText(this).apply { id = R.id.fixed_location_name; hint = getString(R.string.place_name); setText(settings.locationName()); setSingleLine(true); inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS }
+        val name = EditText(this).apply { id = R.id.fixed_location_name; hint = getString(R.string.place_name); setText(settings.place); setSingleLine(true); inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS; visibility = if (settings.followCurrent) View.GONE else View.VISIBLE }
         location.addView(name)
         watch(name) { value ->
-            if (!changingName) {
-                if (settings.followCurrent) settings.currentPlace = value.trim() else settings.place = value.trim()
+            if (!changingName && !settings.followCurrent) {
+                settings.place = value.trim()
                 save(); drawCharts()
             }
         }
@@ -202,6 +204,7 @@ class MainActivity : Activity() {
         val coordinates = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; visibility = View.GONE }
         fixed.addView(button(getString(R.string.search_location)) {
             searchPlaces { place ->
+                pendingFixedLocation = false; cancelActiveLocation()
                 settings.latitude = place.latitude; settings.longitude = place.longitude
                 settings.fixedLatitude = place.latitude; settings.fixedLongitude = place.longitude
                 settings.place = place.name; settings.locationAt = 0; settings.accuracy = 0f
@@ -226,6 +229,7 @@ class MainActivity : Activity() {
             if (lat == null || lon == null || !lat.isFinite() || !lon.isFinite() || lat !in -90.0..90.0 || lon !in -180.0..180.0) {
                 latitude.error = getString(R.string.invalid_coordinates)
             } else {
+                pendingFixedLocation = false; cancelActiveLocation()
                 settings.latitude = lat; settings.longitude = lon; settings.place = name.text.toString().trim(); settings.locationAt = 0; settings.accuracy = 0f
                 settings.fixedLatitude = lat; settings.fixedLongitude = lon
                 save(); recalculate()
@@ -233,7 +237,10 @@ class MainActivity : Activity() {
         }.apply { id = R.id.save_fixed_location })
         fixed.addView(coordinates)
         location.addView(fixed)
-        val locateButton = button(getString(R.string.use_my_location)) { if (follow.isChecked) requestLocation() else follow.isChecked = true }
+        val locateButton = button(getString(R.string.use_my_location)) {
+            specific.isChecked = true
+            requestLocation(fixed = true)
+        }.apply { id = R.id.capture_my_location }
         location.addView(locateButton)
         val background = Switch(this).apply { text = getString(R.string.background_follow); isChecked = settings.backgroundFollow; minHeight = dp(48); visibility = if (settings.followCurrent) View.VISIBLE else View.GONE }
         backgroundStatus = text("", 12f, muted)
@@ -252,15 +259,17 @@ class MainActivity : Activity() {
             }
         }
         modes.setOnCheckedChangeListener { _, selected ->
+            pendingFixedLocation = false; cancelActiveLocation()
             val checked = selected == follow.id
             if (checked && !settings.followCurrent && settings.point() != null) {
                 settings.fixedLatitude = settings.latitude; settings.fixedLongitude = settings.longitude
             }
             settings.followCurrent = checked; fixed.visibility = if (checked) View.GONE else View.VISIBLE
             background.visibility = if (checked) View.VISIBLE else View.GONE
+            name.visibility = if (checked) View.GONE else View.VISIBLE
             if (checked) { settings.latitude = Double.NaN; settings.longitude = Double.NaN; settings.locationAt = 0 }
             if (!checked) {
-                access.cancel()
+                continueBackgroundPermission = false
                 if (settings.fixedLatitude.isFinite() && settings.fixedLongitude.isFinite()) {
                     settings.latitude = settings.fixedLatitude; settings.longitude = settings.fixedLongitude
                     settings.locationAt = 0; settings.accuracy = 0f
@@ -270,7 +279,7 @@ class MainActivity : Activity() {
                     longitude.setText(String.format(java.util.Locale.ROOT, "%.6f", settings.longitude))
                 }
             }
-            changingName = true; name.setText(settings.locationName()); changingName = false
+            changingName = true; name.setText(settings.place); changingName = false
             save(); recalculate(); updateBackgroundStatus(); if (checked) requestLocation()
         }
         updateLocationStatus()
@@ -439,7 +448,7 @@ class MainActivity : Activity() {
     } ?: getString(R.string.no_extremum)
     private fun updateLocationStatus() {
         if (!::locationStatus.isInitialized) return
-        if (settings.followCurrent && locating) { locationStatus.text = getString(R.string.location_searching); return }
+        if (locating) { locationStatus.text = getString(R.string.location_searching); return }
         if (settings.followCurrent && !access.permitted() && store.locationPermissionAsked) { locationStatus.text = getString(R.string.no_location_permission); return }
         locationStatus.text = if (settings.followCurrent) {
             val details = if (settings.locationAt > 0) {
@@ -448,24 +457,45 @@ class MainActivity : Activity() {
             details + getString(if (settings.backgroundFollow && BackgroundLocation.permitted(this)) R.string.location_following else R.string.location_stored)
         } else settings.label() + (settings.point()?.let { String.format(java.util.Locale.getDefault(), "\n%.4f°, %.4f°", it.latitude, it.longitude) } ?: "")
     }
-    private fun requestLocation() {
-        if (stopped || !settings.followCurrent) return
+    private fun cancelActiveLocation() { locationGeneration++; locating = false; access.cancel() }
+    private fun requestLocation(fixed: Boolean = false) {
+        if (stopped || settings.followCurrent == fixed) return
         if (!access.permitted()) {
+            pendingFixedLocation = fixed
             store.locationPermissionAsked = true
             requestPermissions(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION), 21)
             return
         }
+        pendingFixedLocation = false
+        val generation = ++locationGeneration
+        val requestedWidget = widgetId
+        val previousName = settings.place
         locationStatus.text = getString(R.string.location_searching)
         locating = true
         access.request { location ->
+            if (stopped || generation != locationGeneration || widgetId != requestedWidget || settings.followCurrent == fixed) return@request
             locating = false
-            if (stopped || !settings.followCurrent) return@request
             if (location == null) locationStatus.text = getString(R.string.location_failed)
             else {
                 settings.latitude = location.latitude; settings.longitude = location.longitude
                 settings.locationAt = location.time; settings.accuracy = location.accuracy
+                if (fixed) {
+                    settings.fixedLatitude = location.latitude; settings.fixedLongitude = location.longitude
+                    // A new point must not silently retain the old place's name.
+                    // Preserve a name entered while the location request was pending.
+                    if (settings.place == previousName) settings.place = ""
+                    findViewById<EditText>(R.id.fixed_latitude).setText(String.format(java.util.Locale.ROOT, "%.6f", location.latitude))
+                    findViewById<EditText>(R.id.fixed_longitude).setText(String.format(java.util.Locale.ROOT, "%.6f", location.longitude))
+                    findViewById<EditText>(R.id.fixed_location_name).apply {
+                        setText(settings.place); requestFocus(); setSelection(text.length)
+                        post {
+                            if (!isFinishing && !isDestroyed && isFocused)
+                                getSystemService(android.view.inputmethod.InputMethodManager::class.java).showSoftInput(this, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+                        }
+                    }
+                }
                 // Refresh the single retained fix of other current-location widgets.
-                for (id in WidgetUpdates.ids(this)) {
+                for (id in if (fixed) intArrayOf() else WidgetUpdates.ids(this)) {
                     if (id == widgetId) continue
                     store.update(id) { other -> if (other.followCurrent && location.time >= other.locationAt) {
                         other.latitude = location.latitude; other.longitude = location.longitude; other.locationAt = location.time; other.accuracy = location.accuracy
@@ -478,7 +508,8 @@ class MainActivity : Activity() {
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grants: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grants)
         if (requestCode == 21) {
-            if (access.permitted()) requestLocation() else locationStatus.text = getString(R.string.no_location_permission)
+            val fixed = pendingFixedLocation; pendingFixedLocation = false
+            if (access.permitted()) requestLocation(fixed) else locationStatus.text = getString(R.string.no_location_permission)
             val followSetup = continueBackgroundPermission; continueBackgroundPermission = false
             if (followSetup && settings.followCurrent && settings.backgroundFollow && access.permitted()) requestBackgroundPermission()
         }

@@ -12,18 +12,18 @@ import android.os.Handler
 import android.os.Looper
 
 /** Bounded foreground approximate-location request; background following is a separate opt-in. */
-class LocationAccess(private val activity: Activity) {
+open class LocationAccess(private val activity: Activity) {
     private val manager = activity.getSystemService(Context.LOCATION_SERVICE) as LocationManager
     private val handler = Handler(Looper.getMainLooper())
     private var listener: LocationListener? = null
     private var timeout: Runnable? = null
-    fun permitted() = activity.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+    open fun permitted() = activity.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
     fun cancel() {
         listener?.let { try { manager.removeUpdates(it) } catch (_: SecurityException) {} }
         timeout?.let { handler.removeCallbacks(it) }; listener = null; timeout = null
     }
     @android.annotation.SuppressLint("MissingPermission") // Checked by permitted() before every request.
-    fun request(callback: (Location?) -> Unit) {
+    open fun request(callback: (Location?) -> Unit) {
         cancel()
         if (!permitted()) { callback(null); return }
         val providers = listOf(LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER)

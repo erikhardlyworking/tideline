@@ -15,7 +15,7 @@
     <string name="place_search_count">%1$d matches shown. Select a place to use it.</string>
     <string name="enter_coordinates">Enter coordinates</string>
     <string name="show_location_name">Show location name on widget</string>
-    <string name="location_name_help">Applies to this widget. Long names are shortened to fit the last line.</string>
+    <string name="location_name_help">Moving locations are labelled Current. Fixed locations can have a name. Long names are shortened to fit the last line.</string>
     <string name="globe_description">Globe centred on %1$s. The red point marks the selected location.</string>
     <string name="accuracy_note" formatted="false">Approximate tides. At tested sites, median RMS error was 5.3% of tidal range (6.5 cm). Local errors can be much larger. Weather effects are excluded.</string>
     <string name="use_current_location">Use current location</string>
