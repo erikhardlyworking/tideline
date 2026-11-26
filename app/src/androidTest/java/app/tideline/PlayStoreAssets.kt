@@ -131,16 +131,18 @@ class PlayStoreAssets(private val runner: Instrumentation) {
                 Thread.sleep(100)
             }
             check(ready) { "Unlock/wake the phone and retry; the real forecast screen must finish drawing" }
-            fun capture(name: String, heading: Int? = null, widgetAtTop: Boolean = false) {
+            fun capture(name: String, heading: Int? = null, targetId: Int? = null) {
                 onUi {
                     val content = screen.findViewById<ViewGroup>(android.R.id.content)
                     val scroll = content.getChildAt(0) as ScrollView
                     val column = scroll.getChildAt(0) as ViewGroup
                     val target = heading?.let { resource -> texts(column).first { it.text.toString() == screen.getString(resource) } }
-                    val top = if (widgetAtTop) {
-                        (0 until column.childCount).map { column.getChildAt(it) }.filterIsInstance<android.widget.ImageView>().first().top
+                    val top = if (targetId != null) {
+                        val view = screen.findViewById<View>(targetId)
+                        val bounds = Rect(); view.getDrawingRect(bounds)
+                        column.offsetDescendantRectToMyCoords(view, bounds); bounds.top
                     } else target?.parent?.let { (it as View).top } ?: 0
-                    scroll.scrollTo(0, (top - (24 * screen.resources.displayMetrics.density).toInt()).coerceAtLeast(0))
+                    scroll.scrollTo(0, top.coerceAtLeast(0))
                 }
                 runner.waitForIdleSync()
                 onUi {
@@ -159,11 +161,49 @@ class PlayStoreAssets(private val runner: Instrumentation) {
             capture("02-day-forecast", R.string.forecast_details)
             capture("03-fixed-location", R.string.location)
             capture("04-appearance", R.string.appearance)
+            capture("05-forecast-window", R.string.forecast_window)
+
+            // A public demonstration fix keeps Current-mode captures private.
+            // All controls/messages are the real MainActivity UI; no phone
+            // position, provider or location-permission setting is changed.
+            onUi {
+                val demoAccess = object : LocationAccess(screen) {
+                    override fun permitted() = true
+                    override fun request(callback: (android.location.Location?) -> Unit) {
+                        callback(android.location.Location("network").apply {
+                            latitude = settings.latitude; longitude = settings.longitude
+                            time = System.currentTimeMillis(); accuracy = 2000f
+                        })
+                    }
+                }
+                MainActivity::class.java.getDeclaredField("access").apply { isAccessible = true }.set(screen, demoAccess)
+                screen.findViewById<android.widget.RadioButton>(R.id.location_mode_current).isChecked = true
+            }
+            runner.waitForIdleSync()
+            capture("06-current-location", targetId = R.id.location_mode_current)
+            onUi { screen.findViewById<android.widget.Switch>(R.id.background_follow_toggle).performClick() }
+            runner.waitForIdleSync()
+            fun clickDialog(id: Int) {
+                onUi {
+                    android.view.inspector.WindowInspector.getGlobalWindowViews()
+                        .mapNotNull { it.findViewById<android.widget.Button>(id) }.last().performClick()
+                }
+                runner.waitForIdleSync()
+            }
+            clickDialog(android.R.id.button1) // Accept the real disclosure.
+            clickDialog(android.R.id.button2) // Decline the Android-settings route.
+            onUi {
+                check(!screen.findViewById<android.widget.Switch>(R.id.background_follow_toggle).isChecked)
+                val message = screen.findViewById<TextView>(R.id.background_follow_status).text as android.text.Spanned
+                check(message.getSpans(0, message.length, android.text.style.StyleSpan::class.java).any { it.style == Typeface.BOLD })
+            }
+            capture("07-background-permission", targetId = R.id.background_follow_toggle)
             File(output, "provenance.txt").writeText(
                 "TideLine ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})\n" +
                 "Icon: unmodified ic_tide Android vector, rendered at 512 px.\n" +
                 "Feature: native Canvas and real 12-hour ChartRenderer/EOT20 forecast, Tregde 58.006377,7.554759; $at UTC milliseconds.\n" +
                 "Screenshots: native MainActivity content, fixed Tregde demo widget $demoId, current calculation time, Europe/Oslo process time zone.\n" +
+                "Settings: fixed location/globe, appearance, forecast window, Current mode and the real bold background-permission failure. Current mode uses an activity-scoped public Tregde location callback; no real phone fix is read. Background permission remains denied; the real disclosure/settings explanation is declined to show its native failure state.\n" +
                 "Only bottom clipping to 9:16; no rescaling, UI replacement or text overlays. No user widget preferences or permissions changed.\n" +
                 "Device: ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}, API ${android.os.Build.VERSION.SDK_INT}.\n")
         } finally {
